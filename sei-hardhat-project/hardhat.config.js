@@ -10,7 +10,7 @@ require('dotenv').config();
  
 // Load environment variables
 const PRIVATE_KEY = process.env.PRIVATE_KEY || '0x0000000000000000000000000000000000000000000000000000000000000000';
- 
+const SECOND_PRIVATE_KEY= process.env.SECOND_PRIVATE_KEY || '0x0000000000000000000000000000000000000000000000000000000000000000';
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   solidity: {
@@ -26,14 +26,14 @@ module.exports = {
     // Sei testnet configuration
     seitestnet: {
       url: 'https://evm-rpc-testnet.sei-apis.com',
-      accounts: [PRIVATE_KEY],
+      accounts: [PRIVATE_KEY,SECOND_PRIVATE_KEY],
       chainId: 1328, // Sei testnet chain ID
       gasPrice: 2000000000 // 2 gwei = 2 nsei
     },
     // Sei mainnet configuration
     seimainnet: {
       url: 'https://evm-rpc.sei-apis.com',
-      accounts: [PRIVATE_KEY],
+      accounts: [PRIVATE_KEY,SECOND_PRIVATE_KEY],
       chainId: 1329, // Sei mainnet chain ID
       gasPrice: 2000000000 // 2 gwei = 2 nsei
     },

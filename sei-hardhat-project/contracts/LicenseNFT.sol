@@ -71,7 +71,7 @@ contract LicenseNFT is ERC721, ERC721URIStorage, Ownable, ReentrancyGuard {
         require(offer.active, "offer inactive");
         require(offer.priceWei > 0, "free? use a request flow");
         require(msg.value >= offer.priceWei, "insufficient payment");
-        require(offer.expiry == 0 || block.timestamp <= offer.expiry, "offer expired");
+        // require(offer.expiry == 0 || block.timestamp <= offer.expiry, "offer expired");
 
         // Mint license NFT to buyer
         _licenseTokenIdCounter.increment();

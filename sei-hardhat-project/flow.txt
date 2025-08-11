@@ -1,0 +1,1 @@
+// mint license contract for every mint_ip 
