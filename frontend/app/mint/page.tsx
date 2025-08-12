@@ -17,6 +17,9 @@ export default function MintPage() {
     date_of_creation: '',
     version: '',
     ip_type: '',
+    category: '',
+    inventors: '',
+    institution: '',
     ownership_type: '',
     owners: [{ name: '', wallet: '' }],
     rights: '',
@@ -86,7 +89,10 @@ export default function MintPage() {
       const fileForm = new FormData()
       fileForm.append('file', formData.researchPaper)
       const pinFileRes = await fetch('/api/pin-file', { method: 'POST', body: fileForm })
-      if (!pinFileRes.ok) throw new Error('Failed to pin file to IPFS')
+      if (!pinFileRes.ok) {
+        const errorData = await pinFileRes.json().catch(() => ({}))
+        throw new Error(`Failed to pin file to IPFS: ${errorData.error || pinFileRes.statusText}`)
+      }
       const { cid: fileCid } = await pinFileRes.json()
       const fileUri = `ipfs://${fileCid}`
 
@@ -129,38 +135,41 @@ export default function MintPage() {
 
       // 4) Upload metadata JSON
       const pinJsonRes = await fetch('/api/pin-json', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(metadata) })
-      if (!pinJsonRes.ok) throw new Error('Failed to pin metadata to IPFS')
+      if (!pinJsonRes.ok) {
+        const errorData = await pinJsonRes.json().catch(() => ({}))
+        throw new Error(`Failed to pin metadata to IPFS: ${errorData.error || pinJsonRes.statusText}`)
+      }
       const { cid: metadataCid } = await pinJsonRes.json()
       const metadataUri = `ipfs://${metadataCid}`
 
       // 5) Call IPNFT.mintIP
       if (!IPNFT_ADDRESS) throw new Error('IPNFT contract address not configured')
-      // const ethereum = (window as any).ethereum
-      // if (!ethereum) throw new Error('No wallet found. Please install MetaMask')
-      // const provider = new ethers.BrowserProvider(ethereum)
-      // await provider.send('eth_requestAccounts', [])
-      // const signer = await provider.getSigner()
-      // const userAddress = await signer.getAddress()
-      // const ipnft = new ethers.Contract(IPNFT_ADDRESS, IPNFT_ABI, signer)
+      const ethereum = (window as any).ethereum
+      if (!ethereum) throw new Error('No wallet found. Please install MetaMask')
+      const provider = new ethers.BrowserProvider(ethereum)
+      await provider.send('eth_requestAccounts', [])
+      const signer = await provider.getSigner()
+      const userAddress = await signer.getAddress()
+      const ipnft = new ethers.Contract(IPNFT_ADDRESS, IPNFT_ABI, signer)
 
-      // const royaltyRecipient = userAddress
-      // const royaltyBps = 500 // 5%
-      // const payees = [userAddress]
-      // const shares = [100]
+      const royaltyRecipient = userAddress
+      const royaltyBps = 500 // 5%
+      const payees = [userAddress]
+      const shares = [100]
 
-      // const tx = await ipnft.mintIP(
-      //   userAddress,
-      //   metadataUri,
-      //   hashHex,
-      //   royaltyRecipient,
-      //   royaltyBps,
-      //   payees,
-      //   shares
-      // )
-      // const receipt = await tx.wait()
+      const tx = await ipnft.mintIP(
+        userAddress,
+        metadataUri,
+        hashHex,
+        royaltyRecipient,
+        royaltyBps,
+        payees,
+        shares
+      )
+      const receipt = await tx.wait()
 
-      // alert(`Minted! Tx: ${tx.hash}`)
-      // console.log('Mint receipt', receipt)
+      alert(`Minted! Tx: ${tx.hash}`)
+      console.log('Mint receipt', receipt)
     } catch (err: any) {
       console.error(err)
       alert(err?.message || 'Failed to mint')
@@ -250,43 +259,86 @@ export default function MintPage() {
                 </div>
               </div>
 
-              {/* Inventors and Institution */}
+              {/* Authors Section */}
               <div>
-                <h2 className="text-2xl font-semibold text-gray-900 mb-6">Inventors & Institution</h2>
+                <h2 className="text-2xl font-semibold text-gray-900 mb-6">Authors & Contributors</h2>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label htmlFor="inventors" className="block text-sm font-medium text-gray-700 mb-2">
-                      Inventors/Researchers *
-                    </label>
-                    <input
-                      type="text"
-                      id="inventors"
-                      name="inventors"
-                      required
-                      value={formData.inventors}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
-                      placeholder="Full names of all inventors"
-                    />
+                {formData.authors.map((author, idx) => (
+                  <div key={idx} className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 p-4 border border-gray-200 rounded-lg">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Author {idx + 1} Name *
+                      </label>
+                      <input
+                        type="text"
+                        name="name"
+                        required
+                        value={author.name}
+                        onChange={(e) => handleAuthorChange(idx, e)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="Full name"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        ORCID ID
+                      </label>
+                      <input
+                        type="text"
+                        name="orcid"
+                        value={author.orcid}
+                        onChange={(e) => handleAuthorChange(idx, e)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="0000-0000-0000-0000"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Affiliation
+                      </label>
+                      <input
+                        type="text"
+                        name="affiliation"
+                        value={author.affiliation}
+                        onChange={(e) => handleAuthorChange(idx, e)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="Institution/Organization"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Wallet Address
+                      </label>
+                      <input
+                        type="text"
+                        name="wallet"
+                        value={author.wallet}
+                        onChange={(e) => handleAuthorChange(idx, e)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="0x..."
+                      />
+                    </div>
+                    {formData.authors.length > 1 && (
+                      <div className="md:col-span-2">
+                        <button
+                          type="button"
+                          onClick={() => removeAuthor(idx)}
+                          className="text-red-600 hover:text-red-800 text-sm"
+                        >
+                          Remove Author
+                        </button>
+                      </div>
+                    )}
                   </div>
-
-                  <div>
-                    <label htmlFor="institution" className="block text-sm font-medium text-gray-700 mb-2">
-                      Institution/Organization *
-                    </label>
-                    <input
-                      type="text"
-                      id="institution"
-                      name="institution"
-                      required
-                      value={formData.institution}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
-                      placeholder="University, company, or research institute"
-                    />
-                  </div>
-                </div>
+                ))}
+                
+                <button
+                  type="button"
+                  onClick={addAuthor}
+                  className="text-primary-600 hover:text-primary-800 text-sm font-medium"
+                >
+                  + Add Another Author
+                </button>
               </div>
 
               {/* File Uploads */}
@@ -418,7 +470,7 @@ export default function MintPage() {
                       Processing...
                     </div>
                   ) : (
-                    'Submit for IP Analysis'
+                    'Mint IP NFT'
                   )}
                 </button>
               </div>

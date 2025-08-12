@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { DynamicWidget } from '@dynamic-labs/sdk-react-core';
+
 
 export default function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -56,6 +56,13 @@ export default function Navigation() {
               className="relative px-4 py-2 text-gray-700 hover:text-primary-600 rounded-lg text-sm font-medium transition-all duration-300 hover:bg-primary-50 group"
             >
               <span className="relative z-10">Mint IP</span>
+              <div className="absolute inset-0 bg-primary-100 rounded-lg scale-0 group-hover:scale-100 transition-transform duration-300 origin-center"></div>
+            </Link>
+            <Link 
+              href="/ip-gallery" 
+              className="relative px-4 py-2 text-gray-700 hover:text-primary-600 rounded-lg text-sm font-medium transition-all duration-300 hover:bg-primary-50 group"
+            >
+              <span className="relative z-10">Gallery</span>
               <div className="absolute inset-0 bg-primary-100 rounded-lg scale-0 group-hover:scale-100 transition-transform duration-300 origin-center"></div>
             </Link>
             <Link 
@@ -124,6 +131,13 @@ export default function Navigation() {
             Mint IP
           </Link>
           <Link 
+            href="/ip-gallery" 
+            className="block px-4 py-3 text-gray-700 hover:text-primary-600 hover:bg-primary-50 rounded-lg text-base font-medium transition-all duration-300"
+            onClick={() => setIsMenuOpen(false)}
+          >
+            Gallery
+          </Link>
+          <Link 
             href="/about" 
             className="block px-4 py-3 text-gray-700 hover:text-primary-600 hover:bg-primary-50 rounded-lg text-base font-medium transition-all duration-300"
             onClick={() => setIsMenuOpen(false)}
@@ -131,9 +145,7 @@ export default function Navigation() {
             About
           </Link>
           
-            <DynamicWidget />
-         
-        </div>
+         </div>
       </div>
     </nav>
   )
