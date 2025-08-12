@@ -336,7 +336,7 @@ export default function IPGalleryPage() {
                   <div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
                     <div className="flex justify-between items-center">
                       <div className="text-xs text-gray-500">Content Hash: {formatAddress(ipnft.contentHash)}</div>
-                      <button onClick={() => window.open(`https://seiscan.app/address/${ipnft.owner}`, '_blank')} className="text-primary-600 hover:text-primary-800 text-sm font-medium">View on Explorer</button>
+                      <button onClick={() => window.open(`https://testnet.seistream.app/tokens/${IPNFT_ADDRESS}/${ipnft.tokenId}?standart=erc721`, '_blank')} className="text-primary-600 hover:text-primary-800 text-sm font-medium">View on Explorer</button>
                     </div>
                   </div>
                 </div>
