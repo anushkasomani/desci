@@ -16,7 +16,6 @@ import "./IPNFT.sol";
 
 contract LicenseNFT is ERC721, ERC721URIStorage, Ownable, ReentrancyGuard {
     using Counters for Counters.Counter;
-    Counters.Counter private _licenseOfferIdCounter;
     Counters.Counter private _licenseTokenIdCounter;
 
     IPNFT public ipContract;
@@ -31,10 +30,11 @@ contract LicenseNFT is ERC721, ERC721URIStorage, Ownable, ReentrancyGuard {
         bool active;
     }
 
-    mapping(uint256 => LicenseOffer) public licenseOffers;
+    // Multiple offers per IP tokenId
+    mapping(uint256 => LicenseOffer[]) public licenseOffersByIp;
 
-    event LicenseOfferCreated(uint256 indexed offerId, uint256 indexed ipTokenId, address indexed ipOwner, uint256 priceWei, string licenseURI, uint64 expiry);
-    event LicensePurchased(uint256 indexed offerId, uint256 indexed licenseTokenId, address indexed buyer, uint256 priceWei);
+    event LicenseOfferCreated(uint256 indexed ipTokenId, uint256 indexed offerIndex, address indexed ipOwner, uint256 priceWei, string licenseURI, uint64 expiry);
+    event LicensePurchased(uint256 indexed ipTokenId, uint256 indexed licenseTokenId, address indexed buyer, uint256 offerIndex, uint256 priceWei);
 
     constructor(address _ipContract, string memory name_, string memory symbol_) ERC721(name_, symbol_) {
         require(_ipContract != address(0), "ip contract zero");
@@ -49,25 +49,26 @@ contract LicenseNFT is ERC721, ERC721URIStorage, Ownable, ReentrancyGuard {
     ) external returns (uint256) {
         require(ipContract.ownerOf(ipTokenId) == msg.sender, "not ip owner");
 
-        _licenseOfferIdCounter.increment();
-        uint256 offerId = _licenseOfferIdCounter.current();
+        uint256 offerIndex = licenseOffersByIp[ipTokenId].length;
+        licenseOffersByIp[ipTokenId].push(
+            LicenseOffer({
+                offerId: offerIndex,
+                ipTokenId: ipTokenId,
+                ipOwner: msg.sender,
+                priceWei: priceWei,
+                licenseURI: licenseURI,
+                expiry: expiry,
+                active: true
+            })
+        );
 
-        licenseOffers[offerId] = LicenseOffer({
-            offerId: offerId,
-            ipTokenId: ipTokenId,
-            ipOwner: msg.sender,
-            priceWei: priceWei,
-            licenseURI: licenseURI,
-            expiry: expiry,
-            active: true
-        });
-
-        emit LicenseOfferCreated(offerId, ipTokenId, msg.sender, priceWei, licenseURI, expiry);
-        return offerId;
+        emit LicenseOfferCreated(ipTokenId, offerIndex, msg.sender, priceWei, licenseURI, expiry);
+        return offerIndex;
     }
 
-    function buyLicense(uint256 offerId) external payable nonReentrant returns (uint256) {
-        LicenseOffer storage offer = licenseOffers[offerId];
+    function buyLicense(uint256 ipTokenId, uint256 offerIndex) external payable nonReentrant returns (uint256) {
+        require(offerIndex < licenseOffersByIp[ipTokenId].length, "no offer");
+        LicenseOffer storage offer = licenseOffersByIp[ipTokenId][offerIndex];
         require(offer.active, "offer inactive");
         require(offer.priceWei > 0, "free? use a request flow");
         require(msg.value >= offer.priceWei, "insufficient payment");
@@ -92,15 +93,19 @@ contract LicenseNFT is ERC721, ERC721URIStorage, Ownable, ReentrancyGuard {
             require(refunded, "refund failed");
         }
 
-        emit LicensePurchased(offerId, licenseTokenId, msg.sender, offer.priceWei);
+        emit LicensePurchased(ipTokenId, licenseTokenId, msg.sender, offerIndex, offer.priceWei);
         return licenseTokenId;
     }
 
-    function deactivateOffer(uint256 offerId) external {
-        LicenseOffer storage offer = licenseOffers[offerId];
-        require(offer.offerId != 0, "no offer");
+    function deactivateOffer(uint256 ipTokenId, uint256 offerIndex) external {
+        require(offerIndex < licenseOffersByIp[ipTokenId].length, "no offer");
+        LicenseOffer storage offer = licenseOffersByIp[ipTokenId][offerIndex];
         require(offer.ipOwner == msg.sender, "not creator");
         offer.active = false;
+    }
+
+    function getOfferCount(uint256 ipTokenId) external view returns (uint256) {
+        return licenseOffersByIp[ipTokenId].length;
     }
 
     /* ---------- Overrides for ERC721 + ERC721URIStorage ---------- */

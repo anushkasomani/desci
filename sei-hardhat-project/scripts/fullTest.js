@@ -53,16 +53,18 @@ async function main() {
   const offerEvent = offerReceipt.logs.find(log => {
     try { return licenseNft.interface.parseLog(log).name === "LicenseOfferCreated"; } catch { return false; }
   });
-  const offerId = licenseNft.interface.parseLog(offerEvent).args[0];
-  console.log("Created License Offer ID:", offerId.toString());
+  const parsedOffer = licenseNft.interface.parseLog(offerEvent);
+  const offerIndex = parsedOffer.args[1];
+  console.log("Created License Offer Index:", offerIndex.toString());
 
   // 2. acc2 buys the license
-  const buyTx = await licenseNft.connect(acc2).buyLicense(offerId, { value: hre.ethers.parseEther("0.1") });
+  const buyTx = await licenseNft.connect(acc2).buyLicense(tokenId, offerIndex, { value: hre.ethers.parseEther("0.1") });
   const buyReceipt = await buyTx.wait();
   const licensePurchasedEvent = buyReceipt.logs.find(log => {
     try { return licenseNft.interface.parseLog(log).name === "LicensePurchased"; } catch { return false; }
   });
-  const licenseTokenId = licenseNft.interface.parseLog(licensePurchasedEvent).args[1];
+  const parsedPurchase = licenseNft.interface.parseLog(licensePurchasedEvent);
+  const licenseTokenId = parsedPurchase.args[1];
   console.log("Minted LicenseNFT Token ID:", licenseTokenId.toString());
 
   // 3. Transfer LicenseNFT to acc1

@@ -1,7 +1,9 @@
+'use client'
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-
+import Providers from "./providers";
+import '@sei-js/sei-global-wallet/eip6963';
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -14,56 +16,56 @@ const geistMono = Geist_Mono({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: "ScienceIP - Transform Research into Intellectual Property",
-  description: "Empowering scientists and researchers to convert their discoveries into valuable intellectual property assets. AI-powered research to IP platform.",
-  keywords: ["intellectual property", "patents", "research", "AI", "innovation", "science", "technology"],
-  authors: [{ name: "ScienceIP" }],
-  creator: "ScienceIP",
-  publisher: "ScienceIP",
-  formatDetection: {
-    email: false,
-    address: false,
-    telephone: false,
-  },
-  metadataBase: new URL("https://scienceip.com"),
-  openGraph: {
-    title: "ScienceIP - Transform Research into Intellectual Property",
-    description: "Empowering scientists and researchers to convert their discoveries into valuable intellectual property assets.",
-    url: "https://scienceip.com",
-    siteName: "ScienceIP",
-    images: [
-      {
-        url: "/og-image.jpg",
-        width: 1200,
-        height: 630,
-        alt: "ScienceIP - Research to IP Platform",
-      },
-    ],
-    locale: "en_US",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "ScienceIP - Transform Research into Intellectual Property",
-    description: "Empowering scientists and researchers to convert their discoveries into valuable intellectual property assets.",
-    images: ["/og-image.jpg"],
-  },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      "max-video-preview": -1,
-      "max-image-preview": "large",
-      "max-snippet": -1,
-    },
-  },
-  verification: {
-    google: "your-google-verification-code",
-  },
-};
+// export const metadata: Metadata = {
+//   title: "ScienceIP - Transform Research into Intellectual Property",
+//   description: "Empowering scientists and researchers to convert their discoveries into valuable intellectual property assets. AI-powered research to IP platform.",
+//   keywords: ["intellectual property", "patents", "research", "AI", "innovation", "science", "technology"],
+//   authors: [{ name: "ScienceIP" }],
+//   creator: "ScienceIP",
+//   publisher: "ScienceIP",
+//   formatDetection: {
+//     email: false,
+//     address: false,
+//     telephone: false,
+//   },
+//   metadataBase: new URL("https://scienceip.com"),
+//   openGraph: {
+//     title: "ScienceIP - Transform Research into Intellectual Property",
+//     description: "Empowering scientists and researchers to convert their discoveries into valuable intellectual property assets.",
+//     url: "https://scienceip.com",
+//     siteName: "ScienceIP",
+//     images: [
+//       {
+//         url: "/og-image.jpg",
+//         width: 1200,
+//         height: 630,
+//         alt: "ScienceIP - Research to IP Platform",
+//       },
+//     ],
+//     locale: "en_US",
+//     type: "website",
+//   },
+//   twitter: {
+//     card: "summary_large_image",
+//     title: "ScienceIP - Transform Research into Intellectual Property",
+//     description: "Empowering scientists and researchers to convert their discoveries into valuable intellectual property assets.",
+//     images: ["/og-image.jpg"],
+//   },
+//   robots: {
+//     index: true,
+//     follow: true,
+//     googleBot: {
+//       index: true,
+//       follow: true,
+//       "max-video-preview": -1,
+//       "max-image-preview": "large",
+//       "max-snippet": -1,
+//     },
+//   },
+//   verification: {
+//     google: "your-google-verification-code",
+//   },
+// };
 
 export default function RootLayout({
   children,
@@ -82,7 +84,7 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
       <body className="antialiased">
-        {children}
+       <Providers>{children}</Providers>
       </body>
     </html>
   );

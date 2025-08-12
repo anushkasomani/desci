@@ -3,14 +3,36 @@
 import { useState } from 'react'
 import Navigation from '../components/Navigation'
 import Footer from '../components/Footer'
+import { IPNFT_ADDRESS, IPNFT_ABI } from '../config/contracts'
+import { ethers } from 'ethers'
+
+// Helper for default author
+const defaultAuthor = { name: '', orcid: '', affiliation: '', wallet: '' }
 
 export default function MintPage() {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    category: '',
-    inventors: '',
-    institution: '',
+    authors: [ { ...defaultAuthor } ],
+    date_of_creation: '',
+    version: '',
+    ip_type: '',
+    ownership_type: '',
+    owners: [{ name: '', wallet: '' }],
+    rights: '',
+    license_type: '',
+    license_terms: '',
+    permanent_uri: '',
+    content_hash: '',
+    provenance: '',
+    keywords: '',
+    identifiers: '',
+    attribution: '',
+    minting_info: '',
+    peer_review_status: '',
+    funding_info: '',
+    supplementary_media: '',
+    ai_summary: '',
     researchPaper: null as File | null,
     additionalFiles: [] as File[],
     contactEmail: '',
@@ -18,6 +40,20 @@ export default function MintPage() {
   })
 
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Handlers for dynamic fields (authors, owners)
+  const handleAuthorChange = (idx: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setFormData(prev => {
+      const authors = [...prev.authors]
+      authors[idx] = { ...authors[idx], [name]: value }
+      return { ...prev, authors }
+    })
+  }
+  const addAuthor = () => setFormData(prev => ({ ...prev, authors: [...prev.authors, { ...defaultAuthor }] }))
+  const removeAuthor = (idx: number) => setFormData(prev => ({ ...prev, authors: prev.authors.filter((_, i) => i !== idx) }))
+
+  // Similar handlers for owners if needed
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -38,12 +74,99 @@ export default function MintPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    
-    setIsSubmitting(false)
-    alert('Your IP submission has been received! We will review your research and contact you within 48 hours.')
+    try {
+      if (!formData.researchPaper) throw new Error('Research paper file is required')
+
+      // 1) Compute SHA-256 of research paper
+      const buffer = await formData.researchPaper.arrayBuffer()
+      const digest = await crypto.subtle.digest('SHA-256', buffer)
+      const hashHex = '0x' + Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('')
+
+      // 2) Upload file to IPFS via Pinata
+      const fileForm = new FormData()
+      fileForm.append('file', formData.researchPaper)
+      const pinFileRes = await fetch('/api/pin-file', { method: 'POST', body: fileForm })
+      if (!pinFileRes.ok) throw new Error('Failed to pin file to IPFS')
+      const { cid: fileCid } = await pinFileRes.json()
+      const fileUri = `ipfs://${fileCid}`
+
+      // Owners parsing (simple single owner for now)
+      const ownerEntries = formData.owners && formData.owners.length > 0 ? formData.owners : [{ name: '', wallet: '' }]
+
+      // 3) Build metadata JSON
+      const metadata = {
+        title: formData.title,
+        description: formData.description,
+        authors: formData.authors,
+        date_of_creation: formData.date_of_creation,
+        version: formData.version,
+        ip_type: formData.ip_type,
+        ownership: {
+          type: formData.ownership_type,
+          owners: ownerEntries
+        },
+        rights: formData.rights,
+        license: {
+          type: formData.license_type,
+          terms: formData.license_terms
+        },
+        permanent_content_reference: {
+          uri: fileUri,
+          content_hash: hashHex
+        },
+        provenance: formData.provenance,
+        keywords: formData.keywords.split(',').map(k => k.trim()).filter(Boolean),
+        identifiers: formData.identifiers,
+        attribution: formData.attribution,
+        minting_info: formData.minting_info,
+        optional: {
+          peer_review_status: formData.peer_review_status,
+          funding_info: formData.funding_info,
+          supplementary_media: formData.supplementary_media,
+          ai_summary: formData.ai_summary
+        }
+      }
+
+      // 4) Upload metadata JSON
+      const pinJsonRes = await fetch('/api/pin-json', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(metadata) })
+      if (!pinJsonRes.ok) throw new Error('Failed to pin metadata to IPFS')
+      const { cid: metadataCid } = await pinJsonRes.json()
+      const metadataUri = `ipfs://${metadataCid}`
+
+      // 5) Call IPNFT.mintIP
+      if (!IPNFT_ADDRESS) throw new Error('IPNFT contract address not configured')
+      // const ethereum = (window as any).ethereum
+      // if (!ethereum) throw new Error('No wallet found. Please install MetaMask')
+      // const provider = new ethers.BrowserProvider(ethereum)
+      // await provider.send('eth_requestAccounts', [])
+      // const signer = await provider.getSigner()
+      // const userAddress = await signer.getAddress()
+      // const ipnft = new ethers.Contract(IPNFT_ADDRESS, IPNFT_ABI, signer)
+
+      // const royaltyRecipient = userAddress
+      // const royaltyBps = 500 // 5%
+      // const payees = [userAddress]
+      // const shares = [100]
+
+      // const tx = await ipnft.mintIP(
+      //   userAddress,
+      //   metadataUri,
+      //   hashHex,
+      //   royaltyRecipient,
+      //   royaltyBps,
+      //   payees,
+      //   shares
+      // )
+      // const receipt = await tx.wait()
+
+      // alert(`Minted! Tx: ${tx.hash}`)
+      // console.log('Mint receipt', receipt)
+    } catch (err: any) {
+      console.error(err)
+      alert(err?.message || 'Failed to mint')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (

@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
+import { DynamicWidget } from '@dynamic-labs/sdk-react-core';
 
 export default function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -129,15 +130,9 @@ export default function Navigation() {
           >
             About
           </Link>
-          <div className="pt-4 px-4">
-            <Link 
-              href="/mint" 
-              className="btn-primary w-full text-center block"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              Get Started
-            </Link>
-          </div>
+          
+            <DynamicWidget />
+         
         </div>
       </div>
     </nav>
