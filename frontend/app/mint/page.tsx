@@ -181,36 +181,136 @@ export default function MintPage() {
         royaltyBps,
         payees,
         shares
-      )
-      const receipt = await tx.wait()
-
+              )
+        const receipt = await tx.wait()
+        
+        // Parse logs to find IPMinted event
+        let ipTokenId: string | null = null
+        for (const log of receipt.logs) {
+          try {
+            const parsed = ipnft.interface.parseLog(log);
+            if (parsed && parsed.name === "IPMinted") {
+              console.log("IPMinted args:", parsed.args);
+              ipTokenId = parsed.args.tokenId
+              break
+            }
+          } catch (err) {
+            // Log not from this contract, ignore
+          }
+        }
+        
+        if (!ipTokenId) {
+          throw new Error('Could not find IPMinted event in transaction receipt')
+        }
+        
+        console.log("IP Token ID extracted:", ipTokenId)
       // 6) Mint license NFT if license contract is configured
       const licenseContractAddress = process.env.NEXT_PUBLIC_LICENSE_CONTRACT_ADDRESS
+      console.log('License contract address:', licenseContractAddress)
+      
       if (licenseContractAddress) {
         try {
-          const licenseContract = new ethers.Contract(licenseContractAddress, LicenseNFT_ABI, signer)
+          console.log('Starting license creation process...')
+          console.log('IP Token ID:', ipTokenId)
+          console.log('User address:', userAddress)
           
-          // Mint license NFT with metadata
+          const licenseContract = new ethers.Contract(licenseContractAddress, LicenseNFT_ABI, signer)
+          console.log('License contract instance created')
+          
+          // Create license metadata JSON
           const licenseMetadata = {
             name: `License for ${formData.title}`,
             description: `License NFT for intellectual property: ${formData.title}`,
             licenseType: formData.license_type,
             licenseTerms: formData.license_terms,
-            ipNFTId: receipt.logs[0]?.topics[1] || '0x0', // Extract IP NFT ID from receipt
-            owner: userAddress
+            ipNFTId: ipTokenId.toString(),
+            owner: userAddress,
+            createdAt: new Date().toISOString(),
+            price: "0.001 ETH"
+          }
+          console.log('License metadata created:', licenseMetadata)
+
+          // Upload license metadata to IPFS
+          console.log('Uploading license metadata to IPFS...')
+          const licensePinRes = await fetch('/api/pin-json', { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify(licenseMetadata) 
+          })
+          console.log('License pin response status:', licensePinRes.status)
+          
+          if (!licensePinRes.ok) {
+            const errorText = await licensePinRes.text()
+            console.error('License pin error response:', errorText)
+            throw new Error(`Failed to pin license metadata to IPFS: ${licensePinRes.status} - ${errorText}`)
           }
           
-          const licenseTx = await licenseContract.mintLicense(userAddress, JSON.stringify(licenseMetadata))
-          await licenseTx.wait()
-          console.log('License NFT minted:', licenseTx.hash)
-        } catch (licenseErr) {
-          console.warn('Failed to mint license NFT:', licenseErr)
-          // Don't fail the main mint if license minting fails
+          const licensePinData = await licensePinRes.json()
+          console.log('License pin response data:', licensePinData)
+          
+          const { cid: licenseCid } = licensePinData
+          const licenseUri = `ipfs://${licenseCid}`
+          console.log('License URI:', licenseUri)
+
+          // Create license offer with all required parameters
+          const priceInWei = ethers.parseEther("0.001")
+          const expiry = 0 // 0 means never expires
+          console.log('Creating license offer with params:', {
+            ipTokenId: ipTokenId.toString(),
+            priceWei: priceInWei.toString(),
+            licenseUri,
+            expiry
+          })
+          
+          const licenseTx = await licenseContract.createLicenseOffer(
+            ipTokenId, 
+            priceInWei, 
+            licenseUri, 
+            expiry
+          )
+          console.log('License transaction sent:', licenseTx.hash)
+          
+          console.log('Waiting for license transaction confirmation...')
+          const licenseReceipt = await licenseTx.wait()
+          console.log('License transaction confirmed:', licenseReceipt)
+          
+          // Look for the LicenseOfferCreated event
+          const licenseEvent = licenseReceipt.events?.find((e: any) => e.event === "LicenseOfferCreated")
+          if (licenseEvent) {
+            console.log('LicenseOfferCreated event found:', licenseEvent.args)
+          } else {
+            console.log('No LicenseOfferCreated event found in receipt')
+          }
+          
+          console.log('License term created successfully!')
+        } catch (licenseErr: any) {
+          console.error('Failed to create license term:', licenseErr)
+          console.error('Error details:', {
+            message: licenseErr.message,
+            code: licenseErr.code,
+            data: licenseErr.data,
+            stack: licenseErr.stack
+          })
+          
+          // Show user-friendly error message
+          if (licenseErr.code === 'ACTION_REJECTED') {
+            alert('License creation was rejected by user')
+          } else if (licenseErr.code === 'INSUFFICIENT_FUNDS') {
+            alert('Insufficient funds for license creation')
+          } else {
+            alert(`License creation failed: ${licenseErr.message || 'Unknown error'}`)
+          }
         }
+      } else {
+        console.log('No license contract address configured, skipping license creation')
       }
 
-      alert(`IP NFT Minted Successfully! Transaction: ${tx.hash}`)
-      console.log('Mint receipt', receipt)
+      console.log('IP NFT minted successfully!')
+      console.log('Transaction hash:', tx.hash)
+      console.log('Mint receipt:', receipt)
+      
+      // Show success message
+      alert(`IP NFT Minted Successfully!\n\nTransaction: ${tx.hash}\nToken ID: ${ipTokenId}\n\nLicense creation will be attempted next...`)
     } catch (err: any) {
       console.error(err)
       alert(err?.message || 'Failed to mint')
