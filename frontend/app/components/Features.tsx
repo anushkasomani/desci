@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 
 export default function Features() {
   const [mounted, setMounted] = useState(false)
@@ -128,20 +129,27 @@ export default function Features() {
         </div>
 
         {/* Bottom CTA */}
-        <div className={`text-center mt-16 ${mounted ? 'animate-fade-in animation-delay-1000' : 'opacity-0'}`}>
-          <div className="inline-flex items-center space-x-4 bg-white rounded-2xl shadow-lg border border-gray-200/50 px-8 py-6">
-            <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-xl flex items-center justify-center">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </div>
+        <div className={`text-center mt-20 ${mounted ? 'animate-fade-in animation-delay-800' : 'opacity-0'}`}>
+          <div className="inline-flex items-center space-x-4 bg-white/40 backdrop-blur-md rounded-2xl shadow-lg border border-white/30 px-8 py-6">
             <div className="text-left">
-              <h3 className="text-lg font-semibold text-gray-900">Ready to get started?</h3>
-              <p className="text-gray-600">Join thousands of researchers transforming their work into IP</p>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">Ready to Transform Your Research?</h3>
+              <p className="text-gray-600 mb-4">Join the future of intellectual property management</p>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Link href="/mint" className="btn-primary px-8 py-3">
+                  Start Minting
+                </Link>
+                <Link href="/gallery" className="btn-secondary px-8 py-3">
+                  Browse Gallery
+                </Link>
+              </div>
             </div>
-            <a href="/mint" className="btn-primary">
-              Start Now
-            </a>
+            <div className="hidden lg:block">
+              <div className="w-24 h-24 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-2xl flex items-center justify-center shadow-lg">
+                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ScienceIP Frontend
 
-## Getting Started
+## Setup Requirements
 
-First, run the development server:
+### Environment Variables
+
+Create a `.env.local` file in the frontend directory with the following variables:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# IPNFT Contract Address
+NEXT_PUBLIC_IPNFT_ADDRESS=0x...
+
+# License NFT Contract Address  
+NEXT_PUBLIC_LICENSE_CONTRACT_ADDRESS=0x...
+
+# Pinata JWT (for IPFS uploads)
+PINATA_JWT=your_pinata_jwt_here
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Getting Pinata JWT
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Go to [Pinata](https://app.pinata.cloud/)
+2. Create an account or sign in
+3. Go to API Keys section
+4. Create a new API key with the following permissions:
+   - `pinFileToIPFS` - for uploading files
+   - `pinJSONToIPFS` - for uploading metadata
+5. Copy the JWT token to your `.env.local` file
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Features
 
-## Learn More
+- **IP Type Selection**: Choose from research paper, patent, invention, software, algorithm, dataset, methodology, formula, design, or other
+- **Authors Management**: Add multiple authors with ORCID, affiliation, and wallet addresses
+- **Ownership & Rights**: Configure ownership type and rights
+- **License Management**: Select from various license types with default terms
+- **IPFS Integration**: Automatic file and metadata upload to IPFS via Pinata
+- **Blockchain Minting**: Mint IP NFTs on the blockchain
+- **License NFT**: Automatic license NFT minting when configured
 
-To learn more about Next.js, take a look at the following resources:
+### Metadata Structure
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The metadata follows this structure:
+```json
+{
+  "title": "Research Title",
+  "description": "Research Description", 
+  "authors": [...],
+  "ip_type": "research_paper|patent|invention|...",
+  "ownership": {
+    "type": "individual|joint|institutional|...",
+    "owners": [...]
+  },
+  "rights": "All rights reserved|Some rights reserved|...",
+  "license": {
+    "type": "Creative Commons Attribution 4.0 International|...",
+    "terms": "License terms..."
+  },
+  "permanent_content_reference": {
+    "uri": "https://gateway.pinata.cloud/ipfs/CID",
+    "content_hash": "0x..."
+  }
+}
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### API Endpoints
 
-## Deploy on Vercel
+- `/api/pin-file` - Upload files to IPFS
+- `/api/pin-json` - Upload metadata JSON to IPFS
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Both endpoints use Pinata for IPFS pinning with JWT authentication.

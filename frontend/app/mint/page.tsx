@@ -3,11 +3,17 @@
 import { useState } from 'react'
 import Navigation from '../components/Navigation'
 import Footer from '../components/Footer'
-import { IPNFT_ADDRESS, IPNFT_ABI } from '../config/contracts'
+import { IPNFT_ADDRESS, IPNFT_ABI, LicenseNFT_ABI } from '../config/contracts'
 import { ethers } from 'ethers'
 
 // Helper for default author
 const defaultAuthor = { name: '', orcid: '', affiliation: '', wallet: '' }
+
+// Default license terms
+const DEFAULT_LICENSE_TERMS = {
+  type: 'Creative Commons Attribution 4.0 International',
+  terms: 'This work is licensed under the Creative Commons Attribution 4.0 International License. To view a copy of this license, visit http://creativecommons.org/licenses/by/4.0/ or send a letter to Creative Commons, PO Box 1866, Mountain View, CA 94042, USA.'
+}
 
 export default function MintPage() {
   const [formData, setFormData] = useState({
@@ -15,24 +21,24 @@ export default function MintPage() {
     description: '',
     authors: [ { ...defaultAuthor } ],
     date_of_creation: '',
-    version: '',
+    version: '1.0.0',
     ip_type: '',
     category: '',
     inventors: '',
     institution: '',
-    ownership_type: '',
+    ownership_type: 'individual',
     owners: [{ name: '', wallet: '' }],
-    rights: '',
-    license_type: '',
-    license_terms: '',
+    rights: 'All rights reserved',
+    license_type: 'Creative Commons Attribution 4.0 International',
+    license_terms: DEFAULT_LICENSE_TERMS.terms,
     permanent_uri: '',
     content_hash: '',
-    provenance: '',
+    provenance: 'Minted via ScienceIP Platform',
     keywords: '',
     identifiers: '',
     attribution: '',
-    minting_info: '',
-    peer_review_status: '',
+    minting_info: 'IP NFT minted on blockchain',
+    peer_review_status: 'Not peer reviewed',
     funding_info: '',
     supplementary_media: '',
     ai_summary: '',
@@ -56,7 +62,17 @@ export default function MintPage() {
   const addAuthor = () => setFormData(prev => ({ ...prev, authors: [...prev.authors, { ...defaultAuthor }] }))
   const removeAuthor = (idx: number) => setFormData(prev => ({ ...prev, authors: prev.authors.filter((_, i) => i !== idx) }))
 
-  // Similar handlers for owners if needed
+  // Handle owner changes
+  const handleOwnerChange = (idx: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setFormData(prev => {
+      const owners = [...prev.owners]
+      owners[idx] = { ...owners[idx], [name]: value }
+      return { ...prev, owners }
+    })
+  }
+  const addOwner = () => setFormData(prev => ({ ...prev, owners: [...prev.owners, { name: '', wallet: '' }] }))
+  const removeOwner = (idx: number) => setFormData(prev => ({ ...prev, owners: prev.owners.filter((_, i) => i !== idx) }))
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -94,42 +110,42 @@ export default function MintPage() {
         throw new Error(`Failed to pin file to IPFS: ${errorData.error || pinFileRes.statusText}`)
       }
       const { cid: fileCid } = await pinFileRes.json()
+      
+      // Use gateway URL format instead of ipfs://
+      const gatewayUrl = `https://moccasin-broad-kiwi-732.mypinata.cloud/ipfs/${fileCid}`
       const fileUri = `ipfs://${fileCid}`
 
-      // Owners parsing (simple single owner for now)
-      const ownerEntries = formData.owners && formData.owners.length > 0 ? formData.owners : [{ name: '', wallet: '' }]
-
-      // 3) Build metadata JSON
+      // 3) Build metadata JSON with proper values
       const metadata = {
-        title: formData.title,
-        description: formData.description,
-        authors: formData.authors,
-        date_of_creation: formData.date_of_creation,
-        version: formData.version,
-        ip_type: formData.ip_type,
+        title: formData.title || 'Untitled Research',
+        description: formData.description || 'Research description not provided',
+        authors: formData.authors.filter(author => author.name.trim()),
+        date_of_creation: formData.date_of_creation || new Date().toISOString(),
+        version: formData.version || "1.0.0",
+        ip_type: formData.ip_type || 'research_paper',
         ownership: {
-          type: formData.ownership_type,
-          owners: ownerEntries
+          type: formData.ownership_type || 'individual',
+          owners: formData.owners.filter(owner => owner.name.trim() || owner.wallet.trim())
         },
-        rights: formData.rights,
+        rights: formData.rights || 'All rights reserved',
         license: {
-          type: formData.license_type,
-          terms: formData.license_terms
+          type: formData.license_type || 'Creative Commons Attribution 4.0 International',
+          terms: formData.license_terms || DEFAULT_LICENSE_TERMS.terms
         },
         permanent_content_reference: {
-          uri: fileUri,
+          uri: gatewayUrl, // Use gateway URL here
           content_hash: hashHex
         },
-        provenance: formData.provenance,
+        provenance: formData.provenance || 'Minted via ScienceIP Platform',
         keywords: formData.keywords.split(',').map(k => k.trim()).filter(Boolean),
-        identifiers: formData.identifiers,
-        attribution: formData.attribution,
-        minting_info: formData.minting_info,
+        identifiers: formData.identifiers || '',
+        attribution: formData.attribution || formData.authors[0]?.name || 'Unknown',
+        minting_info: formData.minting_info || 'IP NFT minted on blockchain',
         optional: {
-          peer_review_status: formData.peer_review_status,
-          funding_info: formData.funding_info,
-          supplementary_media: formData.supplementary_media,
-          ai_summary: formData.ai_summary
+          peer_review_status: formData.peer_review_status || 'Not peer reviewed',
+          funding_info: formData.funding_info || '',
+          supplementary_media: formData.supplementary_media || '',
+          ai_summary: formData.ai_summary || ''
         }
       }
 
@@ -168,7 +184,32 @@ export default function MintPage() {
       )
       const receipt = await tx.wait()
 
-      alert(`Minted! Tx: ${tx.hash}`)
+      // 6) Mint license NFT if license contract is configured
+      const licenseContractAddress = process.env.NEXT_PUBLIC_LICENSE_CONTRACT_ADDRESS
+      if (licenseContractAddress) {
+        try {
+          const licenseContract = new ethers.Contract(licenseContractAddress, LicenseNFT_ABI, signer)
+          
+          // Mint license NFT with metadata
+          const licenseMetadata = {
+            name: `License for ${formData.title}`,
+            description: `License NFT for intellectual property: ${formData.title}`,
+            licenseType: formData.license_type,
+            licenseTerms: formData.license_terms,
+            ipNFTId: receipt.logs[0]?.topics[1] || '0x0', // Extract IP NFT ID from receipt
+            owner: userAddress
+          }
+          
+          const licenseTx = await licenseContract.mintLicense(userAddress, JSON.stringify(licenseMetadata))
+          await licenseTx.wait()
+          console.log('License NFT minted:', licenseTx.hash)
+        } catch (licenseErr) {
+          console.warn('Failed to mint license NFT:', licenseErr)
+          // Don't fail the main mint if license minting fails
+        }
+      }
+
+      alert(`IP NFT Minted Successfully! Transaction: ${tx.hash}`)
       console.log('Mint receipt', receipt)
     } catch (err: any) {
       console.error(err)
@@ -218,25 +259,27 @@ export default function MintPage() {
                   </div>
 
                   <div>
-                    <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-2">
-                      Research Category *
+                    <label htmlFor="ip_type" className="block text-sm font-medium text-gray-700 mb-2">
+                      IP Type *
                     </label>
                     <select
-                      id="category"
-                      name="category"
+                      id="ip_type"
+                      name="ip_type"
                       required
-                      value={formData.category}
+                      value={formData.ip_type}
                       onChange={handleInputChange}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
                     >
-                      <option value="">Select category</option>
-                      <option value="biotechnology">Biotechnology</option>
-                      <option value="chemistry">Chemistry</option>
-                      <option value="physics">Physics</option>
-                      <option value="engineering">Engineering</option>
-                      <option value="computer-science">Computer Science</option>
-                      <option value="medicine">Medicine</option>
-                      <option value="materials-science">Materials Science</option>
+                      <option value="">Select IP type</option>
+                      <option value="research_paper">Research Paper</option>
+                      <option value="patent">Patent</option>
+                      <option value="invention">Invention</option>
+                      <option value="software">Software</option>
+                      <option value="algorithm">Algorithm</option>
+                      <option value="dataset">Dataset</option>
+                      <option value="methodology">Methodology</option>
+                      <option value="formula">Formula</option>
+                      <option value="design">Design</option>
                       <option value="other">Other</option>
                     </select>
                   </div>
@@ -255,6 +298,21 @@ export default function MintPage() {
                     onChange={handleInputChange}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
                     placeholder="Describe your research, key findings, and potential applications..."
+                  />
+                </div>
+
+                <div className="mt-6">
+                  <label htmlFor="keywords" className="block text-sm font-medium text-gray-700 mb-2">
+                    Keywords (comma-separated)
+                  </label>
+                  <input
+                    type="text"
+                    id="keywords"
+                    name="keywords"
+                    value={formData.keywords}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                    placeholder="AI, machine learning, research, innovation..."
                   />
                 </div>
               </div>
@@ -339,6 +397,132 @@ export default function MintPage() {
                 >
                   + Add Another Author
                 </button>
+              </div>
+
+              {/* Ownership Section */}
+              <div>
+                <h2 className="text-2xl font-semibold text-gray-900 mb-6">Ownership & Rights</h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                  <div>
+                    <label htmlFor="ownership_type" className="block text-sm font-medium text-gray-700 mb-2">
+                      Ownership Type *
+                    </label>
+                    <select
+                      id="ownership_type"
+                      name="ownership_type"
+                      required
+                      value={formData.ownership_type}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                    >
+                      <option value="individual">Individual</option>
+                      <option value="joint">Joint Ownership</option>
+                      <option value="institutional">Institutional</option>
+                      <option value="corporate">Corporate</option>
+                      <option value="government">Government</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label htmlFor="rights" className="block text-sm font-medium text-gray-700 mb-2">
+                      Rights *
+                    </label>
+                    <select
+                      id="rights"
+                      name="rights"
+                      required
+                      value={formData.rights}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                    >
+                      <option value="All rights reserved">All rights reserved</option>
+                      <option value="Some rights reserved">Some rights reserved</option>
+                      <option value="Public domain">Public domain</option>
+                      <option value="Creative Commons">Creative Commons</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Owners */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Owners *
+                  </label>
+                  {formData.owners.map((owner, idx) => (
+                    <div key={idx} className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <input
+                        type="text"
+                        name="name"
+                        placeholder="Owner name"
+                        value={owner.name}
+                        onChange={(e) => handleOwnerChange(idx, e)}
+                        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      />
+                      <input
+                        type="text"
+                        name="wallet"
+                        placeholder="Wallet address (0x...)"
+                        value={owner.wallet}
+                        onChange={(e) => handleOwnerChange(idx, e)}
+                        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      />
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addOwner}
+                    className="text-primary-600 hover:text-primary-800 text-sm font-medium"
+                  >
+                    + Add Another Owner
+                  </button>
+                </div>
+              </div>
+
+              {/* License Section */}
+              <div>
+                <h2 className="text-2xl font-semibold text-gray-900 mb-6">License Information</h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                  <div>
+                    <label htmlFor="license_type" className="block text-sm font-medium text-gray-700 mb-2">
+                      License Type *
+                    </label>
+                    <select
+                      id="license_type"
+                      name="license_type"
+                      required
+                      value={formData.license_type}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                    >
+                      <option value="Creative Commons Attribution 4.0 International">Creative Commons Attribution 4.0 International</option>
+                      <option value="Creative Commons Attribution-ShareAlike 4.0 International">Creative Commons Attribution-ShareAlike 4.0 International</option>
+                      <option value="Creative Commons Attribution-NonCommercial 4.0 International">Creative Commons Attribution-NonCommercial 4.0 International</option>
+                      <option value="MIT License">MIT License</option>
+                      <option value="Apache License 2.0">Apache License 2.0</option>
+                      <option value="GNU General Public License v3.0">GNU General Public License v3.0</option>
+                      <option value="All rights reserved">All rights reserved</option>
+                      <option value="Custom">Custom</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="license_terms" className="block text-sm font-medium text-gray-700 mb-2">
+                    License Terms *
+                  </label>
+                  <textarea
+                    id="license_terms"
+                    name="license_terms"
+                    required
+                    rows={4}
+                    value={formData.license_terms}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                    placeholder="License terms and conditions..."
+                  />
+                </div>
               </div>
 
               {/* File Uploads */}
