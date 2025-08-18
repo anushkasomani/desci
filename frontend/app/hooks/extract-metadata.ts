@@ -6,25 +6,65 @@ interface MetadataResponse {
 
 export const uploadMetadataFile = async (file: File): Promise<MetadataResponse> => {
   try {
-    const formData = new FormData();
-    formData.append('file', file);
+    const formDataForMetadata = new FormData();
+    formDataForMetadata.append('file', file);
 
-    const response = await fetch('https://sei-agents-metadata.onrender.com/metadata', {
-      method: 'POST',
-      body: formData,
-    });
+    const formDataForSummary = new FormData();
+    formDataForSummary.append('file', file);
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    const [metadataRes, summaryRes] = await Promise.all([
+      fetch('https://sei-agents-metadata.onrender.com/metadata', {
+        method: 'POST',
+        body: formDataForMetadata,
+      }),
+      fetch('https://sei-agents-metadata.onrender.com/summary', {
+        method: 'POST',
+        body: formDataForSummary,
+      })
+    ]);
+
+    if (!metadataRes.ok) {
+      throw new Error(`Metadata HTTP error: ${metadataRes.status}`);
+    }
+    if (!summaryRes.ok) {
+      throw new Error(`Summary HTTP error: ${summaryRes.status}`);
     }
 
-    const result = await response.json();
-    
-    return {
-      success: true,
-      data: result
+    const [metadataJson, summaryJson] = await Promise.all([
+      metadataRes.json(),
+      summaryRes.json(),
+    ]);
+
+    const merged = {
+      ...metadataJson,
+      abstract: summaryJson?.abstract || metadataJson?.abstract || '',
+      keywords: summaryJson?.keywords || metadataJson?.keywords || [],
+      ai_summary: {
+        abstract: summaryJson?.abstract || metadataJson?.abstract || '',
+        keywords: summaryJson?.keywords || metadataJson?.keywords || [],
+        problem_statement: summaryJson?.problem_statement || '',
+        methodology_summary: summaryJson?.methodology_summary || '',
+        results_summary: summaryJson?.results_summary || '',
+        conclusion_summary: summaryJson?.conclusion_summary || '',
+        contributions: summaryJson?.contributions || '',
+        field_of_study: summaryJson?.field_of_study || '',
+        subfields: summaryJson?.subfields || [],
+        tasks: summaryJson?.tasks || [],
+        datasets_used: summaryJson?.datasets_used || null,
+        code_link: summaryJson?.code_link || null,
+        application_domains: summaryJson?.application_domains || [],
+        bibtex: summaryJson?.bibtex || metadataJson?.bibtex_string || ''
+      },
+      raw: {
+        metadata: metadataJson,
+        summary: summaryJson,
+      }
     };
 
+    return {
+      success: true,
+      data: merged
+    };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
     
@@ -33,4 +73,9 @@ export const uploadMetadataFile = async (file: File): Promise<MetadataResponse> 
       error: errorMessage
     };
   }
+};
+
+export const uploadFileWithSummary = async (file: File): Promise<MetadataResponse> => {
+  // Backwards-compatible alias
+  return uploadMetadataFile(file);
 };

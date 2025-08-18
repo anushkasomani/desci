@@ -60,6 +60,34 @@ export default function MintPage() {
     error: null
   })
 
+  // Track which fields were auto-filled by AI to improve UX cues
+  const [aiFilled, setAiFilled] = useState<{ title: boolean; description: boolean; keywords: boolean; ai_summary: boolean}>({
+    title: false,
+    description: false,
+    keywords: false,
+    ai_summary: false,
+  })
+
+  // Parse authors from extracted metadata using rule:
+  // - Split only on " and " (case-insensitive)
+  // - Commas are part of the same author's name
+  const deriveAuthorsFromExtracted = (raw: any): { name: string; orcid: string; affiliation: string; wallet: string }[] => {
+    const toArray = (val: any): string[] => {
+      if (!val) return []
+      if (Array.isArray(val)) return val.filter(Boolean)
+      if (typeof val === 'string') return [val]
+      return []
+    }
+    const rawAuthors = toArray(raw?.authors || raw?.author || raw?.creators)
+    const splitOnAnd = (s: string): string[] => s.split(/\s+and\s+/i)
+    const normalize = (s: string): string => s.replace(/\s+/g, ' ').trim()
+    const names: string[] = rawAuthors
+      .flatMap(s => splitOnAnd(String(s)))
+      .map(normalize)
+      .filter(Boolean)
+    return names.map(n => ({ name: n, orcid: '', affiliation: '', wallet: '' }))
+  }
+
   // Handlers for dynamic fields (authors, owners)
   const handleAuthorChange = (idx: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -105,6 +133,34 @@ export default function MintPage() {
           if (result.success) {
             console.log('✅ Metadata extraction successful:', result.data)
             setMetadataStatus(prev => ({ ...prev, isExtracting: false, result: result.data, error: null }))
+            const extracted: any = result.data || {}
+            const titleCandidate = (extracted.title || '').trim()
+            const descriptionCandidate = extracted.high_level_overview || extracted.abstract || extracted.ai_summary?.abstract || ''
+            const keywordsCandidate = Array.isArray(extracted.keywords) ? extracted.keywords.join(', ') : ''
+            const aiSummaryCandidate = extracted.ai_summary ? [
+              extracted.ai_summary.problem_statement,
+              extracted.ai_summary.methodology_summary,
+              extracted.ai_summary.results_summary,
+              extracted.ai_summary.conclusion_summary
+            ].filter(Boolean).join('\n\n') : (descriptionCandidate || '')
+            const authorsFromExtracted = deriveAuthorsFromExtracted(extracted)
+
+            setFormData(prev => ({
+              ...prev,
+              title: prev.title || titleCandidate || prev.title,
+              description: prev.description || descriptionCandidate || prev.description,
+              keywords: prev.keywords || keywordsCandidate || prev.keywords,
+              ai_summary: prev.ai_summary || aiSummaryCandidate || prev.ai_summary,
+              authors: (prev.authors.length === 1 && !prev.authors[0].name && authorsFromExtracted.length > 0)
+                ? authorsFromExtracted
+                : prev.authors,
+            }))
+            setAiFilled({
+              title: !formData.title && !!titleCandidate,
+              description: !formData.description && !!descriptionCandidate,
+              keywords: !formData.keywords && !!keywordsCandidate,
+              ai_summary: !formData.ai_summary && !!aiSummaryCandidate,
+            })
           } else {
             console.error('❌ Metadata extraction failed:', result.error)
             setMetadataStatus(prev => ({ ...prev, isExtracting: false, error: result.error || 'Unknown error', result: null }))
@@ -368,7 +424,8 @@ export default function MintPage() {
             <form onSubmit={handleSubmit} className="space-y-8">
               {/* Basic Information */}
               <div>
-                <h2 className="text-2xl font-semibold text-gray-900 mb-6">Research Information</h2>
+                <h2 className="text-2xl font-semibold text-gray-900 mb-2">Research Information</h2>
+                <p className="text-sm text-gray-500 mb-6">Tip: Upload your document below to let AI help fill these fields automatically. You can edit them anytime.</p>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
@@ -427,6 +484,23 @@ export default function MintPage() {
                     onChange={handleInputChange}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
                     placeholder="Describe your research, key findings, and potential applications..."
+                  />
+                </div>
+
+                <div className="mt-6">
+                  <label htmlFor="ai_summary" className="block text-sm font-medium text-gray-700 mb-2">
+                    AI Summary {aiFilled.ai_summary && (
+                      <span className="ml-2 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-xs border border-emerald-200">AI filled</span>
+                    )}
+                  </label>
+                  <textarea
+                    id="ai_summary"
+                    name="ai_summary"
+                    rows={4}
+                    value={formData.ai_summary}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                    placeholder="AI generated summary will appear here after upload (you can edit it)"
                   />
                 </div>
 
@@ -714,12 +788,53 @@ export default function MintPage() {
                         {metadataStatus.result && (
                           <div className="text-green-600 text-sm">
                             ✅ Metadata extracted successfully!
-                            <details className="mt-2">
-                              <summary className="cursor-pointer text-blue-600 hover:text-blue-800">View extracted data</summary>
-                              <pre className="mt-2 p-2 bg-white border rounded text-xs overflow-auto max-h-32">
-                                {JSON.stringify(metadataStatus.result, null, 2)}
-                              </pre>
-                            </details>
+                            {/* Friendly summary preview if available */}
+                            {metadataStatus.result.ai_summary && (
+                              <div className="mt-3 text-gray-700">
+                                <h5 className="text-sm font-semibold text-gray-900">AI Summary</h5>
+                                {metadataStatus.result.abstract && (
+                                  <p className="mt-2 text-sm text-gray-700"><span className="font-medium">Abstract:</span> {metadataStatus.result.abstract}</p>
+                                )}
+                                {metadataStatus.result.ai_summary.problem_statement && (
+                                  <p className="mt-2 text-sm"><span className="font-medium">Problem:</span> {metadataStatus.result.ai_summary.problem_statement}</p>
+                                )}
+                                {metadataStatus.result.ai_summary.methodology_summary && (
+                                  <p className="mt-1 text-sm"><span className="font-medium">Methodology:</span> {metadataStatus.result.ai_summary.methodology_summary}</p>
+                                )}
+                                {metadataStatus.result.ai_summary.results_summary && (
+                                  <p className="mt-1 text-sm"><span className="font-medium">Results:</span> {metadataStatus.result.ai_summary.results_summary}</p>
+                                )}
+                                {metadataStatus.result.ai_summary.conclusion_summary && (
+                                  <p className="mt-1 text-sm"><span className="font-medium">Conclusion:</span> {metadataStatus.result.ai_summary.conclusion_summary}</p>
+                                )}
+                                {(() => {
+                                  const rawKw = metadataStatus.result.keywords ?? metadataStatus.result.ai_summary?.keywords
+                                  const kwArray = Array.isArray(rawKw)
+                                    ? rawKw
+                                    : typeof rawKw === 'string'
+                                      ? rawKw.split(',').map((s: string) => s.trim()).filter(Boolean)
+                                      : []
+                                  return kwArray.length > 0 ? (
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                      {kwArray.map((kw: string, i: number) => (
+                                        <span key={`${kw}-${i}`} className="px-2 py-0.5 rounded border text-xs bg-emerald-50 border-emerald-200 text-emerald-800">{kw}</span>
+                                      ))}
+                                    </div>
+                                  ) : null
+                                })()}
+                              </div>
+                            )}
+
+                            <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <details>
+                                <summary className="cursor-pointer text-blue-600 hover:text-blue-800">View metadata (raw)</summary>
+                                <pre className="mt-2 p-2 bg-white border rounded text-xs overflow-auto max-h-48">{JSON.stringify(metadataStatus.result.raw?.metadata ?? metadataStatus.result, null, 2)}</pre>
+                              </details>
+                              <details>
+                                <summary className="cursor-pointer text-blue-600 hover:text-blue-800">View summary (raw)</summary>
+                                <pre className="mt-2 p-2 bg-white border rounded text-xs overflow-auto max-h-48">{JSON.stringify(metadataStatus.result.raw?.summary ?? metadataStatus.result.ai_summary, null, 2)}</pre>
+                              </details>
+                            </div>
                           </div>
                         )}
                         
@@ -734,6 +849,28 @@ export default function MintPage() {
                                 if (result.success) {
                                   console.log('✅ Metadata re-extraction successful:', result.data)
                                   setMetadataStatus(prev => ({ ...prev, isExtracting: false, result: result.data, error: null }))
+                                  const extracted: any = result.data || {}
+                                  const titleCandidate = (extracted.title || '').trim()
+                                  const descriptionCandidate = extracted.high_level_overview || extracted.abstract || extracted.ai_summary?.abstract || ''
+                                  const keywordsCandidate = Array.isArray(extracted.keywords) ? extracted.keywords.join(', ') : ''
+                                  const aiSummaryCandidate = extracted.ai_summary ? [
+                                    extracted.ai_summary.problem_statement,
+                                    extracted.ai_summary.methodology_summary,
+                                    extracted.ai_summary.results_summary,
+                                    extracted.ai_summary.conclusion_summary
+                                  ].filter(Boolean).join('\n\n') : (descriptionCandidate || '')
+                                  const authorsFromExtracted = deriveAuthorsFromExtracted(extracted)
+
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    title: prev.title || titleCandidate || prev.title,
+                                    description: prev.description || descriptionCandidate || prev.description,
+                                    keywords: prev.keywords || keywordsCandidate || prev.keywords,
+                                    ai_summary: prev.ai_summary || aiSummaryCandidate || prev.ai_summary,
+                                    authors: (prev.authors.length === 1 && !prev.authors[0].name && authorsFromExtracted.length > 0)
+                                      ? authorsFromExtracted
+                                      : prev.authors,
+                                  }))
                                 } else {
                                   console.error('❌ Metadata re-extraction failed:', result.error)
                                   setMetadataStatus(prev => ({ ...prev, isExtracting: false, error: result.error || 'Unknown error', result: null }))
