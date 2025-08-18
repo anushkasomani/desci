@@ -5,6 +5,7 @@ import Navigation from '../components/Navigation'
 import Footer from '../components/Footer'
 import { IPNFT_ADDRESS, IPNFT_ABI, LicenseNFT_ABI } from '../config/contracts'
 import { ethers } from 'ethers'
+import { uploadMetadataFile } from '../hooks/extract-metadata'
 
 // Helper for default author
 const defaultAuthor = { name: '', orcid: '', affiliation: '', wallet: '' }
@@ -49,6 +50,15 @@ export default function MintPage() {
   })
 
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [metadataStatus, setMetadataStatus] = useState<{
+    isExtracting: boolean;
+    result: any;
+    error: string | null;
+  }>({
+    isExtracting: false,
+    result: null,
+    error: null
+  })
 
   // Handlers for dynamic fields (authors, owners)
   const handleAuthorChange = (idx: number, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -79,11 +89,30 @@ export default function MintPage() {
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, files } = e.target
     if (files && files.length > 0) {
       if (name === 'researchPaper') {
-        setFormData(prev => ({ ...prev, researchPaper: files[0] }))
+        const file = files[0]
+        setFormData(prev => ({ ...prev, researchPaper: file }))
+        
+        // Automatically call metadata API when research paper is uploaded
+        console.log('Research paper uploaded, calling metadata API...')
+        setMetadataStatus(prev => ({ ...prev, isExtracting: true, error: null, result: null }))
+        
+        try {
+          const result = await uploadMetadataFile(file)
+          if (result.success) {
+            console.log('✅ Metadata extraction successful:', result.data)
+            setMetadataStatus(prev => ({ ...prev, isExtracting: false, result: result.data, error: null }))
+          } else {
+            console.error('❌ Metadata extraction failed:', result.error)
+            setMetadataStatus(prev => ({ ...prev, isExtracting: false, error: result.error || 'Unknown error', result: null }))
+          }
+        } catch (error) {
+          console.error('❌ Error calling metadata API:', error)
+          setMetadataStatus(prev => ({ ...prev, isExtracting: false, error: 'Network error occurred', result: null }))
+        }
       } else if (name === 'additionalFiles') {
         setFormData(prev => ({ ...prev, additionalFiles: Array.from(files) }))
       }
@@ -659,6 +688,68 @@ export default function MintPage() {
                     </div>
                     {formData.researchPaper && (
                       <p className="mt-2 text-sm text-gray-600">✓ {formData.researchPaper.name}</p>
+                    )}
+                    
+                    {/* Metadata Extraction Status */}
+                    {formData.researchPaper && (
+                      <div className="mt-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">AI Metadata Extraction</h4>
+                        
+                        {metadataStatus.isExtracting && (
+                          <div className="flex items-center text-blue-600">
+                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span className="text-sm">Extracting metadata...</span>
+                          </div>
+                        )}
+                        
+                        {metadataStatus.error && (
+                          <div className="text-red-600 text-sm">
+                            ❌ Error: {metadataStatus.error}
+                          </div>
+                        )}
+                        
+                        {metadataStatus.result && (
+                          <div className="text-green-600 text-sm">
+                            ✅ Metadata extracted successfully!
+                            <details className="mt-2">
+                              <summary className="cursor-pointer text-blue-600 hover:text-blue-800">View extracted data</summary>
+                              <pre className="mt-2 p-2 bg-white border rounded text-xs overflow-auto max-h-32">
+                                {JSON.stringify(metadataStatus.result, null, 2)}
+                              </pre>
+                            </details>
+                          </div>
+                        )}
+                        
+                        {/* Manual re-extract button */}
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (formData.researchPaper) {
+                              setMetadataStatus(prev => ({ ...prev, isExtracting: true, error: null, result: null }))
+                              try {
+                                const result = await uploadMetadataFile(formData.researchPaper)
+                                if (result.success) {
+                                  console.log('✅ Metadata re-extraction successful:', result.data)
+                                  setMetadataStatus(prev => ({ ...prev, isExtracting: false, result: result.data, error: null }))
+                                } else {
+                                  console.error('❌ Metadata re-extraction failed:', result.error)
+                                  setMetadataStatus(prev => ({ ...prev, isExtracting: false, error: result.error || 'Unknown error', result: null }))
+                                }
+                              } catch (error) {
+                                console.error('❌ Error calling metadata API:', error)
+                                setMetadataStatus(prev => ({ ...prev, isExtracting: false, error: 'Network error occurred', result: null }))
+                              }
+                            }
+                          }}
+                          className="mt-2 text-xs text-blue-600 hover:text-blue-800 underline"
+                          disabled={metadataStatus.isExtracting}
+                        >
+                          🔄 Re-extract metadata
+                        </button>
+                      </div>
                     )}
                   </div>
 
