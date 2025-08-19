@@ -68,9 +68,7 @@ export default function MintPage() {
     ai_summary: false,
   })
 
-  // Parse authors from extracted metadata using rule:
-  // - Split only on " and " (case-insensitive)
-  // - Commas are part of the same author's name
+
   const deriveAuthorsFromExtracted = (raw: any): { name: string; orcid: string; affiliation: string; wallet: string }[] => {
     const toArray = (val: any): string[] => {
       if (!val) return []
@@ -88,7 +86,6 @@ export default function MintPage() {
     return names.map(n => ({ name: n, orcid: '', affiliation: '', wallet: '' }))
   }
 
-  // Handlers for dynamic fields (authors, owners)
   const handleAuthorChange = (idx: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setFormData(prev => {
@@ -314,8 +311,6 @@ export default function MintPage() {
             price: "0.001 ETH"
           }
           console.log('License metadata created:', licenseMetadata)
-
-          // Upload license metadata to IPFS
           console.log('Uploading license metadata to IPFS...')
           const licensePinRes = await fetch('/api/pin-json', { 
             method: 'POST', 
@@ -334,7 +329,7 @@ export default function MintPage() {
           console.log('License pin response data:', licensePinData)
           
           const { cid: licenseCid } = licensePinData
-          const licenseUri = `ipfs://${licenseCid}`
+          const licenseUri = `ipfs://${licenseCid}` //to do 
           console.log('License URI:', licenseUri)
 
           // Create license offer with all required parameters

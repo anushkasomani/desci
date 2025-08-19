@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import Navigation from '../components/Navigation'
 import Footer from '../components/Footer'
 import { gql, request } from 'graphql-request'
+import { ethers } from 'ethers'
+import { LICENSE_NFT_ADDRESS, LicenseNFT_ABI } from '../config/contracts'
 
 interface IPMetadata {
   title: string
@@ -116,7 +118,49 @@ export default function IPGalleryPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const handleMintLicenseToken = async (tokenId: string) => {
+    try {
+      console.log('minting license token for', tokenId)
+      if (!LICENSE_NFT_ADDRESS) {
+        throw new Error('License contract address is not configured')
+      }
 
+      const ethereum = (typeof window !== 'undefined' ? (window as any).ethereum : undefined)
+      if (!ethereum) {
+        throw new Error('No wallet found. Please install MetaMask or a compatible wallet.')
+      }
+
+      const provider = new ethers.BrowserProvider(ethereum)
+      await provider.send('eth_requestAccounts', [])
+      const signer = await provider.getSigner()
+
+      const licenseContract = new ethers.Contract(LICENSE_NFT_ADDRESS, LicenseNFT_ABI, signer)
+
+      const ipTokenId = ethers.toBigInt(tokenId)
+      const offerIndex = 0
+
+      const offer = await licenseContract.licenseOffersByIp(ipTokenId, offerIndex)
+      if (!offer || !offer.active) {
+        throw new Error('Selected license offer is not active')
+      }
+
+      const priceWei = offer.priceWei as bigint
+      if (!priceWei || priceWei === BigInt(0)) {
+        throw new Error('License price is zero or invalid')
+      }
+
+      console.log('Buying license with params:', { ipTokenId: tokenId, offerIndex, priceWei: priceWei.toString() })
+      const tx = await licenseContract.buyLicense(ipTokenId, offerIndex, { value: priceWei })
+      console.log('Transaction sent:', tx.hash)
+      const receipt = await tx.wait()
+      console.log('License purchased. Receipt:', receipt)
+      alert('License NFT minted successfully!')
+    } catch (e: any) {
+      console.error('Failed to mint license token:', e)
+      setError(e?.message || 'Failed to mint license token')
+      alert(e?.message || 'Failed to mint license token')
+    }
+  }
   const fetchIPNFTs = async (isRefresh = false) => {
     try {
       if (isRefresh) {
@@ -316,6 +360,7 @@ export default function IPGalleryPage() {
                       <span>Type: {ip.metadata.ip_type}</span>
                     </div>
                   )}
+                  <button onClick={()=>handleMintLicenseToken(ip.tokenId)}>mint license token</button>
                 </div>
               </div>
             ))}
