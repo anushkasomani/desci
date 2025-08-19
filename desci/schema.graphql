@@ -91,3 +91,154 @@ type Transfer @entity(immutable: true) {
   blockTimestamp: BigInt!
   transactionHash: Bytes!
 }
+type LicenseNFTApproval @entity(immutable: true) {
+  id: Bytes!
+  owner: Bytes! # address
+  approved: Bytes! # address
+  tokenId: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type LicenseNFTApprovalForAll @entity(immutable: true) {
+  id: Bytes!
+  owner: Bytes! # address
+  operator: Bytes! # address
+  approved: Boolean! # bool
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type LicenseNFTBatchMetadataUpdate @entity(immutable: true) {
+  id: Bytes!
+  _fromTokenId: BigInt! # uint256
+  _toTokenId: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type LicenseOfferCreated @entity(immutable: true) {
+  id: Bytes!
+  ipTokenId: BigInt! # uint256
+  offerIndex: BigInt! # uint256
+  ipOwner: Bytes! # address
+  priceWei: BigInt! # uint256
+  licenseURI: String! # string
+  expiry: BigInt! # uint64
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type LicensePurchased @entity(immutable: true) {
+  id: Bytes!
+  ipTokenId: BigInt! # uint256
+  licenseTokenId: BigInt! # uint256
+  buyer: Bytes! # address
+  offerIndex: BigInt! # uint256
+  priceWei: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type LicenseNFTMetadataUpdate @entity(immutable: true) {
+  id: Bytes!
+  _tokenId: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type LicenseNFTOwnershipTransferred @entity(immutable: true) {
+  id: Bytes!
+  previousOwner: Bytes! # address
+  newOwner: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type LicenseNFTTransfer @entity(immutable: true) {
+  id: Bytes!
+  from: Bytes! # address
+  to: Bytes! # address
+  tokenId: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type DisputeCreated @entity(immutable: true) {
+  id: Bytes!
+  disputeId: BigInt! # uint256
+  ipTokenId: BigInt! # uint256
+  reporter: Bytes! # address
+  reason: String! # string
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type VoteCast @entity(immutable: true) {
+  id: Bytes!
+  disputeId: BigInt! # uint256
+  voter: Bytes! # address
+  voteForRemoval: Boolean! # bool
+  votingPower: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type DisputeResolved @entity(immutable: true) {
+  id: Bytes!
+  disputeId: BigInt! # uint256
+  ipRevoked: Boolean! # bool
+  totalVotes: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type GovernanceTokenMinted @entity(immutable: true) {
+  id: Bytes!
+  user: Bytes! # address
+  amount: BigInt! # uint256
+  cost: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type DerivativeCreated @entity(immutable: true) {
+  id: Bytes!
+  derivativeTokenId: BigInt! # uint256
+  parentTokenIds: [BigInt!]! # uint256[]
+  creator: Bytes! # address
+  derivativeType: String! # string
+  isCommercial: Boolean! # bool
+  consumedLicenseIds: [BigInt!]! # uint256[]
+}
+
+type LicenseConsumed @entity(immutable: true) {
+  id: Bytes!
+  derivativeTokenId: BigInt! # uint256
+  licenseTokenId: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type ParentAttributed @entity(immutable: true) {
+  id: Bytes!
+  derivativeTokenId: BigInt! # uint256
+  parentTokenId: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+

@@ -3,6 +3,15 @@
     "IPNFT": {
       "address": "0x043FdF7F85030B6cF49124675987A8526d495fd8",
       "startBlock": 192898930
+    },
+    "LicenseNFT": {
+      "address": "0x02F13d8505ba549C05D2fa3e32901f8527716616"
+    },
+    "DerivativeIP": {
+      "address": "0x55Bfdb285664Bf4f52c3d6b36c8623c1E2E02be3"
+    },
+    "Desci": {
+      "address": "0x62b8847515A1B47336cCE068FE272e5F93F11b4c"
     }
   }
 }

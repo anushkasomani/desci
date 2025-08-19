@@ -193,7 +193,7 @@ export default function MintPage() {
       }
       const { cid: fileCid } = await pinFileRes.json()
       
-      // Use gateway URL format instead of ipfs://
+
       const gatewayUrl = `https://moccasin-broad-kiwi-732.mypinata.cloud/ipfs/${fileCid}`
       const fileUri = `ipfs://${fileCid}`
 

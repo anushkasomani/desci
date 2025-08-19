@@ -51,3 +51,100 @@ dataSources:
         - event: Transfer(indexed address,indexed address,indexed uint256)
           handler: handleTransfer
       file: ./src/ipnft.ts
+  - kind: ethereum
+    name: LicenseNFT
+    network: sei-atlantic
+    source:
+      address: "0x02F13d8505ba549C05D2fa3e32901f8527716616"
+      abi: LicenseNFT
+      startBlock: 192898916
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - LicenseNFTApproval
+        - LicenseNFTApprovalForAll
+        - LicenseNFTBatchMetadataUpdate
+        - LicenseOfferCreated
+        - LicensePurchased
+        - LicenseNFTMetadataUpdate
+        - LicenseNFTOwnershipTransferred
+        - LicenseNFTTransfer
+      abis:
+        - name: LicenseNFT
+          file: ./abis/LicenseNFT.json
+      eventHandlers:
+        - event: Approval(indexed address,indexed address,indexed uint256)
+          handler: handleApproval
+        - event: ApprovalForAll(indexed address,indexed address,bool)
+          handler: handleApprovalForAll
+        - event: BatchMetadataUpdate(uint256,uint256)
+          handler: handleBatchMetadataUpdate
+        - event: LicenseOfferCreated(indexed uint256,indexed uint256,indexed
+            address,uint256,string,uint64)
+          handler: handleLicenseOfferCreated
+        - event: LicensePurchased(indexed uint256,indexed uint256,indexed address,uint256,uint256)
+          handler: handleLicensePurchased
+        - event: MetadataUpdate(uint256)
+          handler: handleMetadataUpdate
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleOwnershipTransferred
+        - event: Transfer(indexed address,indexed address,indexed uint256)
+          handler: handleTransfer
+      file: ./src/license-nft.ts
+  - kind: ethereum
+    name: DerivativeIP
+    network: sei-atlantic
+    source:
+      address: "0x55Bfdb285664Bf4f52c3d6b36c8623c1E2E02be3"
+      abi: DerivativeIP
+      startBlock: 192898916
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - DerivativeCreated
+        - LicenseConsumed
+        - ParentAttributed
+      abis:
+        - name: DerivativeIP
+          file: ./abis/DerivativeIP.json
+      eventHandlers:
+        - event: DerivativeCreated(indexed uint256,uint256[],indexed address,uint8,bool,uint256[])
+          handler: handleDerivativeCreated
+        - event: LicenseConsumed(indexed uint256,indexed uint256)
+          handler: handleLicenseConsumed
+        - event: ParentAttributed(indexed uint256,indexed uint256)
+          handler: handleParentAttributed
+      file: ./src/derivative-ip.ts
+  - kind: ethereum
+    name: Desci
+    network: sei-atlantic
+    source:
+      address: "0x62b8847515A1B47336cCE068FE272e5F93F11b4c"
+      abi: Desci
+      startBlock: 192898916
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - GovernanceTokenMinted
+        - DisputeCreated
+        - VoteCast
+        - DisputeResolved
+      abis:
+        - name: Desci
+          file: ./abis/Desci.json
+      eventHandlers:
+        - event: GovernanceTokenMinted(indexed address,uint256,uint256)
+          handler: handleGovernanceTokenMinted
+        - event: DisputeCreated(indexed uint256,indexed uint256,indexed address,string)
+          handler: handleDisputeCreated
+        - event: VoteCast(indexed uint256,indexed address,bool,uint256)
+          handler: handleVoteCast
+        - event: DisputeResolved(indexed uint256,bool,uint256)
+          handler: handleDisputeResolved
+      file: ./src/desci.ts

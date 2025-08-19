@@ -5,7 +5,7 @@ import Navigation from '../components/Navigation'
 import Footer from '../components/Footer'
 import { gql, request } from 'graphql-request'
 import { ethers } from 'ethers'
-import { LICENSE_NFT_ADDRESS, LicenseNFT_ABI } from '../config/contracts'
+import { LICENSE_NFT_ADDRESS, LicenseNFT_ABI, DERIVATIVE_IP_NFT_ADDRESS, DerivativeIPNFT_ABI } from '../config/contracts'
 
 interface IPMetadata {
   title: string
@@ -39,6 +39,43 @@ interface IPNFT {
   contentHash: string
   paymentSplitter?: string
   transactionHash?: string
+  offers?: LicenseOffer[]
+}
+
+interface LicenseOffer {
+  offerIndex: number
+  ipTokenId: string
+  ipOwner: string
+  licenseURI: string
+  priceWei: string
+  expiry: string
+  licenseMetadata?: {
+    name?: string
+    description?: string
+    licenseType?: string
+    licenseTerms?: string
+    createdAt?: string
+    owner?: string
+    price?: string
+  }
+}
+
+interface LicensePurchased {
+  buyer: string
+  ipTokenId: string
+  offerIndex: number
+  licenseTokenId: string
+  priceWei: string
+}
+
+interface DerivativeFormData {
+  title: string
+  description: string
+  derivativeType: 'REMIX' | 'EXTENSION' | 'COLLABORATION' | 'VALIDATION' | 'CRITIQUE'
+  isCommercial: boolean
+  additionalContent: string
+  parentTokenIds: string[]
+  licenseTokenIds: string[]
 }
 
 const IPFS_GATEWAYS = [
@@ -118,9 +155,23 @@ export default function IPGalleryPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const handleMintLicenseToken = async (tokenId: string) => {
+  const [showDerivativeModal, setShowDerivativeModal] = useState(false)
+  const [selectedIP, setSelectedIP] = useState<IPNFT | null>(null)
+  const [derivativeForm, setDerivativeForm] = useState<DerivativeFormData>({
+    title: '',
+    description: '',
+    derivativeType: 'EXTENSION',
+    isCommercial: false,
+    additionalContent: '',
+    parentTokenIds: [],
+    licenseTokenIds: []
+  })
+  const [userLicenses, setUserLicenses] = useState<LicensePurchased[]>([])
+  const [userAddress, setUserAddress] = useState<string>('')
+  const [isCreatingDerivative, setIsCreatingDerivative] = useState(false)
+  const handleBuyLicense = async (tokenId: string, offerIndex: number) => {
     try {
-      console.log('minting license token for', tokenId)
+      console.log('buying license for', { tokenId, offerIndex })
       if (!LICENSE_NFT_ADDRESS) {
         throw new Error('License contract address is not configured')
       }
@@ -137,7 +188,6 @@ export default function IPGalleryPage() {
       const licenseContract = new ethers.Contract(LICENSE_NFT_ADDRESS, LicenseNFT_ABI, signer)
 
       const ipTokenId = ethers.toBigInt(tokenId)
-      const offerIndex = 0
 
       const offer = await licenseContract.licenseOffersByIp(ipTokenId, offerIndex)
       if (!offer || !offer.active) {
@@ -161,6 +211,132 @@ export default function IPGalleryPage() {
       alert(e?.message || 'Failed to mint license token')
     }
   }
+
+  const handleCreateDerivative = async () => {
+    console.log('handleCreateDerivative called with:', { selectedIP, derivativeForm, DERIVATIVE_IP_NFT_ADDRESS })
+    
+    if (!selectedIP || !DERIVATIVE_IP_NFT_ADDRESS) {
+      console.error('Missing required data:', { selectedIP: !!selectedIP, DERIVATIVE_IP_NFT_ADDRESS: !!DERIVATIVE_IP_NFT_ADDRESS })
+      alert('Missing required data for derivative creation')
+      return
+    }
+
+    try {
+      setIsCreatingDerivative(true)
+      console.log('Starting derivative creation process...')
+      
+      const ethereum = (typeof window !== 'undefined' ? (window as any).ethereum : undefined)
+      if (!ethereum) {
+        throw new Error('No wallet found. Please install MetaMask or a compatible wallet.')
+      }
+
+      const provider = new ethers.BrowserProvider(ethereum)
+      await provider.send('eth_requestAccounts', [])
+      const signer = await provider.getSigner()
+      const currentAddress = await signer.getAddress()
+      setUserAddress(currentAddress)
+      console.log('Wallet connected:', currentAddress)
+
+      // Create derivative metadata
+      const derivativeMetadata = {
+        title: derivativeForm.title,
+        description: derivativeForm.description,
+        derivativeType: derivativeForm.derivativeType,
+        isCommercial: derivativeForm.isCommercial,
+        additionalContent: derivativeForm.additionalContent,
+        parentTokenIds: derivativeForm.parentTokenIds,
+        parentMetadata: selectedIP.metadata,
+        createdAt: new Date().toISOString(),
+        creator: currentAddress,
+        type: 'derivative_ip'
+      }
+      console.log('Derivative metadata created:', derivativeMetadata)
+
+      // Upload metadata to IPFS
+      console.log('Uploading metadata to IPFS...')
+      const metadataRes = await fetch('/api/pin-json', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(derivativeMetadata)
+      })
+      
+      if (!metadataRes.ok) {
+        const errorText = await metadataRes.text()
+        console.error('IPFS upload failed:', errorText)
+        throw new Error(`Failed to upload derivative metadata: ${metadataRes.status} - ${errorText}`)
+      }
+      
+      const { cid: metadataCid } = await metadataRes.json()
+      const metadataURI = `ipfs://${metadataCid}`
+      console.log('Metadata uploaded to IPFS:', metadataURI)
+
+      // For now, use the same content hash as parent (you can modify this based on your needs)
+      const contentHash = selectedIP.contentHash || ethers.keccak256(ethers.toUtf8Bytes(derivativeForm.title))
+      console.log('Content hash:', contentHash)
+
+      // Convert string arrays to BigInt arrays for the contract
+      const parentTokenIds = derivativeForm.parentTokenIds.map(id => ethers.toBigInt(id))
+      const licenseTokenIds = derivativeForm.licenseTokenIds.map(id => ethers.toBigInt(id))
+      console.log('Contract parameters:', { parentTokenIds, licenseTokenIds, metadataURI, contentHash })
+
+      // Create derivative on contract
+      console.log('Creating derivative on contract...')
+      const derivativeContract = new ethers.Contract(DERIVATIVE_IP_NFT_ADDRESS, DerivativeIPNFT_ABI, signer)
+      
+      const tx = await derivativeContract.createDerivative(
+        parentTokenIds,
+        licenseTokenIds,
+        metadataURI,
+        contentHash,
+        derivativeForm.derivativeType === 'REMIX' ? 0 : 
+        derivativeForm.derivativeType === 'EXTENSION' ? 1 :
+        derivativeForm.derivativeType === 'COLLABORATION' ? 2 :
+        derivativeForm.derivativeType === 'VALIDATION' ? 3 : 4,
+        derivativeForm.isCommercial
+      )
+
+      console.log('Transaction sent:', tx.hash)
+      const receipt = await tx.wait()
+      console.log('Derivative created successfully:', receipt)
+      
+      alert('Derivative IP created successfully!')
+      setShowDerivativeModal(false)
+      setDerivativeForm({
+        title: '',
+        description: '',
+        derivativeType: 'EXTENSION',
+        isCommercial: false,
+        additionalContent: '',
+        parentTokenIds: [],
+        licenseTokenIds: []
+      })
+      
+    } catch (error: any) {
+      console.error('Failed to create derivative:', error)
+      alert(error?.message || 'Failed to create derivative')
+    } finally {
+      setIsCreatingDerivative(false)
+    }
+  }
+
+  const openDerivativeModal = (ip: IPNFT) => {
+    console.log('Opening derivative modal for IP:', ip)
+    setSelectedIP(ip)
+    setDerivativeForm(prev => ({
+      ...prev,
+      parentTokenIds: [ip.tokenId], // Default to current IP as parent
+      title: `${ip.metadata?.title || `IP #${ip.tokenId}`} - Derivative`,
+      description: `Derivative work based on ${ip.metadata?.title || `IP #${ip.tokenId}`}`
+    }))
+    console.log('Derivative form initialized:', {
+      parentTokenIds: [ip.tokenId],
+      title: `${ip.metadata?.title || `IP #${ip.tokenId}`} - Derivative`,
+      description: `Derivative work based on ${ip.metadata?.title || `IP #${ip.tokenId}`}`
+    })
+    setShowDerivativeModal(true)
+    console.log('Modal state set to true')
+  }
+
   const fetchIPNFTs = async (isRefresh = false) => {
     try {
       if (isRefresh) {
@@ -170,21 +346,64 @@ export default function IPGalleryPage() {
       }
       setError(null)
 
-      const url = 'https://api.studio.thegraph.com/query/118776/ip-sei/version/latest'
+      const url = 'https://api.studio.thegraph.com/query/118776/desci/version/latest'
       const headers = { Authorization: 'Bearer 9c42f8dcf2cf487337de6f2b55a971ec' }
 
       const query = gql`
         query MyQuery {
-          ipminteds(orderBy: tokenId, orderDirection: asc) {
+          ipminteds {
             metadataURI
             splitter
             tokenId
             transactionHash
           }
+          licenseOfferCreateds {
+            expiry
+            ipOwner
+            ipTokenId
+            licenseURI
+            offerIndex
+            priceWei
+          }
+          licensePurchaseds {
+            buyer
+            ipTokenId
+            offerIndex
+            licenseTokenId
+            priceWei
+          }
         }
       `
 
-      const data = await request<{ ipminteds: any[] }>(url, query, {}, headers)
+      const data = await request<{ ipminteds: any[]; licenseOfferCreateds: any[]; licensePurchaseds: any[] }>(url, query, {}, headers)
+
+      // Group offers by ipTokenId
+      const offersByIp: Record<string, LicenseOffer[]> = {}
+      for (const offer of (data.licenseOfferCreateds || [])) {
+        const ipId = String(offer.ipTokenId)
+        if (!offersByIp[ipId]) offersByIp[ipId] = []
+        offersByIp[ipId].push({
+          offerIndex: Number(offer.offerIndex),
+          ipTokenId: ipId,
+          ipOwner: offer.ipOwner,
+          licenseURI: offer.licenseURI,
+          priceWei: String(offer.priceWei),
+          expiry: String(offer.expiry)
+        })
+      }
+
+      // Enrich offers with license metadata from IPFS
+      await Promise.all(Object.keys(offersByIp).map(async (ipId) => {
+        const enriched = await Promise.all(offersByIp[ipId].map(async (o) => {
+          try {
+            const meta = await fetchJsonFromUri(o.licenseURI)
+            return { ...o, licenseMetadata: meta || undefined }
+          } catch {
+            return o
+          }
+        }))
+        offersByIp[ipId] = enriched
+      }))
 
       const fetched: IPNFT[] = []
       for (const ip of data.ipminteds) {
@@ -199,11 +418,20 @@ export default function IPGalleryPage() {
           metadataUri: ip.metadataURI,
           contentHash: metadata?.permanent_content_reference?.content_hash || '',
           paymentSplitter: ip.splitter,
-          transactionHash: ip.transactionHash
+          transactionHash: ip.transactionHash,
+          offers: offersByIp[String(ip.tokenId)] || []
         })
       }
 
       setIpnfts(fetched)
+
+      // Process license purchases for current user
+      if (userAddress) {
+        const userPurchases = (data.licensePurchaseds || []).filter(
+          purchase => purchase.buyer.toLowerCase() === userAddress.toLowerCase()
+        )
+        setUserLicenses(userPurchases)
+      }
     } catch (err: any) {
       console.error(err)
       setError(err?.message || 'Failed to fetch data')
@@ -213,13 +441,45 @@ export default function IPGalleryPage() {
     }
   }
 
+  
   useEffect(() => {
     fetchIPNFTs()
+    // Get user's wallet address
+    const getWalletAddress = async () => {
+      try {
+        const ethereum = (typeof window !== 'undefined' ? (window as any).ethereum : undefined)
+        if (ethereum) {
+          const provider = new ethers.BrowserProvider(ethereum)
+          const accounts = await provider.listAccounts()
+          if (accounts.length > 0) {
+            setUserAddress(accounts[0].address)
+          }
+        }
+      } catch (error) {
+        console.log('No wallet connected')
+      }
+    }
+    getWalletAddress()
   }, [])
+
+  // Get user's licenses when address changes
+  useEffect(() => {
+    if (userAddress) {
+      // Refresh data to get user's licenses
+      fetchIPNFTs(true)
+    }
+  }, [userAddress])
 
   const formatAddress = (address: string) => address ? `${address.slice(0, 6)}...${address.slice(-4)}` : ''
   const formatDate = (dateString: string) => {
     try { return new Date(dateString).toLocaleDateString() } catch { return dateString }
+  }
+  const formatWei = (weiString: string) => {
+    try { return ethers.formatEther(weiString) } catch { return weiString }
+  }
+  const truncate = (text: string, max = 160) => {
+    if (!text) return ''
+    return text.length > max ? text.slice(0, max) + '…' : text
   }
 
   const handleRefresh = () => {
@@ -360,13 +620,266 @@ export default function IPGalleryPage() {
                       <span>Type: {ip.metadata.ip_type}</span>
                     </div>
                   )}
-                  <button onClick={()=>handleMintLicenseToken(ip.tokenId)}>mint license token</button>
+                  {/* License Offers */}
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-gray-700">License Offers</span>
+                      <span className="text-xs text-gray-500">{ip.offers?.length || 0} offer{(ip.offers?.length || 0) === 1 ? '' : 's'}</span>
+                    </div>
+                    {ip.offers && ip.offers.length > 0 ? (
+                      <div className="mt-2 space-y-2">
+                        {ip.offers.map((offer) => (
+                          <div key={`${ip.tokenId}-${offer.offerIndex}`} className="p-3 border rounded">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="text-xs text-gray-700 space-y-1 flex-1">
+                                <div className="flex flex-wrap gap-3 items-center">
+                                  <span className="font-semibold text-gray-800">{offer.licenseMetadata?.licenseType || offer.licenseMetadata?.name || 'License'}</span>
+                                  <span className="text-gray-600">{formatWei(offer.priceWei)} ETH</span>
+                                  <span className="text-gray-500">{offer.expiry === '0' ? 'No expiry' : `Expires: ${formatDate(new Date(Number(offer.expiry) * 1000).toISOString())}`}</span>
+                                </div>
+                                {offer.licenseMetadata?.licenseTerms && (
+                                  <div className="text-gray-600 mt-1">{truncate(offer.licenseMetadata.licenseTerms, 160)}</div>
+                                )}
+                                {!offer.licenseMetadata?.licenseTerms && offer.licenseMetadata?.description && (
+                                  <div className="text-gray-600 mt-1">{truncate(offer.licenseMetadata.description, 160)}</div>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => handleBuyLicense(ip.tokenId, Number(offer.offerIndex))}
+                                className="h-8 px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 whitespace-nowrap"
+                              >
+                                Buy
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="mt-2 text-xs text-gray-500">No offers</div>
+                    )}
+                  </div>
+
+                  {/* Create Derivative Button */}
+                  <div className="mt-4">
+                    <button
+                      onClick={() => openDerivativeModal(ip)}
+                      className="w-full px-4 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
+                    >
+                      Create Derivative
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         )}
       </section>
+
+      {/* Derivative Creation Modal */}
+      {showDerivativeModal && selectedIP && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">Create Derivative IP</h2>
+                <button
+                  onClick={() => setShowDerivativeModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <form onSubmit={(e) => { 
+                e.preventDefault(); 
+                console.log('Form submitted, calling handleCreateDerivative');
+                
+                // Validate form
+                if (!derivativeForm.title.trim()) {
+                  alert('Please enter a derivative title');
+                  return;
+                }
+                if (!derivativeForm.description.trim()) {
+                  alert('Please enter a derivative description');
+                  return;
+                }
+                if (derivativeForm.parentTokenIds.length === 0) {
+                  alert('Please select at least one parent IP');
+                  return;
+                }
+                
+                console.log('Form validation passed, calling handleCreateDerivative');
+                handleCreateDerivative(); 
+              }} className="space-y-6">
+                {/* Parent IP Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Parent IP Token IDs *
+                  </label>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={derivativeForm.parentTokenIds.includes(selectedIP.tokenId)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setDerivativeForm(prev => ({
+                              ...prev,
+                              parentTokenIds: [...prev.parentTokenIds, selectedIP.tokenId]
+                            }))
+                          } else {
+                            setDerivativeForm(prev => ({
+                              ...prev,
+                              parentTokenIds: prev.parentTokenIds.filter(id => id !== selectedIP.tokenId)
+                            }))
+                          }
+                        }}
+                        className="rounded"
+                      />
+                      <span className="text-sm text-gray-600">
+                        {selectedIP.metadata?.title || `IP #${selectedIP.tokenId}`} (Current IP)
+                      </span>
+                    </div>
+                    {/* Add more parent IPs here if needed */}
+                  </div>
+                </div>
+
+                {/* User's Licenses */}
+                {userLicenses.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Your Licenses (Optional - for additional parent IPs)
+                    </label>
+                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                      {userLicenses.map((license, index) => (
+                        <div key={index} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            checked={derivativeForm.licenseTokenIds.includes(license.licenseTokenId)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setDerivativeForm(prev => ({
+                                  ...prev,
+                                  licenseTokenIds: [...prev.licenseTokenIds, license.licenseTokenId]
+                                }))
+                              } else {
+                                setDerivativeForm(prev => ({
+                                  ...prev,
+                                  licenseTokenIds: prev.licenseTokenIds.filter(id => id !== license.licenseTokenId)
+                                }))
+                              }
+                            }}
+                            className="rounded"
+                          />
+                          <span className="text-sm text-gray-600">
+                            License for IP #{license.ipTokenId}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Title */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Derivative Title *
+                  </label>
+                  <input
+                    type="text"
+                    value={derivativeForm.title}
+                    onChange={(e) => setDerivativeForm(prev => ({ ...prev, title: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    required
+                  />
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Description *
+                  </label>
+                  <textarea
+                    value={derivativeForm.description}
+                    onChange={(e) => setDerivativeForm(prev => ({ ...prev, description: e.target.value }))}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    required
+                  />
+                </div>
+
+                {/* Derivative Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Derivative Type *
+                  </label>
+                  <select
+                    value={derivativeForm.derivativeType}
+                    onChange={(e) => setDerivativeForm(prev => ({ ...prev, derivativeType: e.target.value as any }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  >
+                    <option value="REMIX">Remix - Modified version of original</option>
+                    <option value="EXTENSION">Extension - Builds upon original work</option>
+                    <option value="COLLABORATION">Collaboration - Joint work with original authors</option>
+                    <option value="VALIDATION">Validation - Reproduces/validates original findings</option>
+                    <option value="CRITIQUE">Critique - Critical analysis of original work</option>
+                  </select>
+                </div>
+
+                {/* Commercial Use */}
+                <div>
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={derivativeForm.isCommercial}
+                      onChange={(e) => setDerivativeForm(prev => ({ ...prev, isCommercial: e.target.checked }))}
+                      className="rounded"
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                      This derivative can be licensed commercially
+                    </span>
+                  </label>
+                </div>
+
+                {/* Additional Content */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Additional Content/Report (Optional)
+                  </label>
+                  <textarea
+                    value={derivativeForm.additionalContent}
+                    onChange={(e) => setDerivativeForm(prev => ({ ...prev, additionalContent: e.target.value }))}
+                    rows={3}
+                    placeholder="Describe any additional content, reports, or modifications..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  />
+                </div>
+
+                {/* Submit Button */}
+                <div className="flex space-x-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowDerivativeModal(false)}
+                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isCreatingDerivative}
+                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                  >
+                    {isCreatingDerivative ? 'Creating...' : 'Create Derivative'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Footer />
     </main>
   )
