@@ -47,6 +47,7 @@ contract LicenseNFT is ERC721, ERC721URIStorage, Ownable, ReentrancyGuard {
         string calldata licenseURI,
         uint64 expiry
     ) external returns (uint256) {
+        require(!ipContract.isSuspended(ipTokenId), "ip suspended");
         require(ipContract.ownerOf(ipTokenId) == msg.sender, "not ip owner");
 
         uint256 offerIndex = licenseOffersByIp[ipTokenId].length;
