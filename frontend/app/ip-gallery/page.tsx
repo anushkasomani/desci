@@ -5,7 +5,7 @@ import Navigation from '../components/Navigation'
 import Footer from '../components/Footer'
 import { gql, request } from 'graphql-request'
 import { ethers } from 'ethers'
-import { LICENSE_NFT_ADDRESS, LicenseNFT_ABI, DERIVATIVE_IP_NFT_ADDRESS, DerivativeIPNFT_ABI } from '../config/contracts'
+import { LICENSE_NFT_ADDRESS, LicenseNFT_ABI, DERIVATIVE_IP_NFT_ADDRESS, DerivativeIPNFT_ABI, DESCI_ADDRESS, Desci_ABI } from '../config/contracts'
 
 interface IPMetadata {
   title: string
@@ -156,7 +156,11 @@ export default function IPGalleryPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showDerivativeModal, setShowDerivativeModal] = useState(false)
+  const [showDisputeModal, setShowDisputeModal] = useState(false)
+  const [showIPDetailsModal, setShowIPDetailsModal] = useState(false)
   const [selectedIP, setSelectedIP] = useState<IPNFT | null>(null)
+  const [disputeReason, setDisputeReason] = useState('')
+  const [isCreatingDispute, setIsCreatingDispute] = useState(false)
   const [derivativeForm, setDerivativeForm] = useState<DerivativeFormData>({
     title: '',
     description: '',
@@ -337,6 +341,56 @@ export default function IPGalleryPage() {
     console.log('Modal state set to true')
   }
 
+  const openDisputeModal = (ip: IPNFT) => {
+    setSelectedIP(ip)
+    setDisputeReason('')
+    setShowDisputeModal(true)
+  }
+
+  const openIPDetails = (ip: IPNFT) => {
+    setSelectedIP(ip)
+    setShowIPDetailsModal(true)
+  }
+
+  const handleCreateDispute = async () => {
+    if (!disputeReason.trim()) {
+      alert('Please provide a reason for the dispute')
+      return
+    }
+
+    try {
+      setIsCreatingDispute(true)
+      
+      const ethereum = (typeof window !== 'undefined' ? (window as any).ethereum : undefined)
+      if (!ethereum) {
+        throw new Error('No wallet found. Please install MetaMask or a compatible wallet.')
+      }
+
+      if (!DESCI_ADDRESS) {
+        throw new Error('Governance contract not configured')
+      }
+
+      const provider = new ethers.BrowserProvider(ethereum)
+      await provider.send('eth_requestAccounts', [])
+      const signer = await provider.getSigner()
+
+      const contract = new ethers.Contract(DESCI_ADDRESS, Desci_ABI, signer)
+      
+      const tx = await contract.createDispute(selectedIP!.tokenId, disputeReason)
+      await tx.wait()
+      
+      alert('Dispute created successfully!')
+      setShowDisputeModal(false)
+      setDisputeReason('')
+      
+    } catch (error: any) {
+      console.error('Failed to create dispute:', error)
+      alert(error?.message || 'Failed to create dispute')
+    } finally {
+      setIsCreatingDispute(false)
+    }
+  }
+
   const fetchIPNFTs = async (isRefresh = false) => {
     try {
       if (isRefresh) {
@@ -462,6 +516,23 @@ export default function IPGalleryPage() {
     getWalletAddress()
   }, [])
 
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showDerivativeModal && !(event.target as Element).closest('.modal-content')) {
+        setShowDerivativeModal(false)
+      }
+      if (showDisputeModal && !(event.target as Element).closest('.modal-content')) {
+        setShowDisputeModal(false)
+      }
+      if (showIPDetailsModal && !(event.target as Element).closest('.modal-content')) {
+        setShowIPDetailsModal(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showDerivativeModal, showDisputeModal, showIPDetailsModal])
+
   // Get user's licenses when address changes
   useEffect(() => {
     if (userAddress) {
@@ -490,7 +561,7 @@ export default function IPGalleryPage() {
     return (
       <main>
         <Navigation />
-        <section className="p-8">
+        <section className="p-8 pt-24">
           <div className="flex items-center space-x-3 mb-6">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
             <h1 className="text-2xl font-bold">Loading IP NFT Gallery...</h1>
@@ -506,7 +577,7 @@ export default function IPGalleryPage() {
     return (
       <main>
         <Navigation />
-        <section className="p-8">
+        <section className="p-8 pt-24">
           <div className="text-center py-12">
             <div className="text-red-500 text-6xl mb-4">⚠️</div>
             <h1 className="text-2xl font-bold text-gray-800 mb-4">Something went wrong</h1>
@@ -535,13 +606,13 @@ export default function IPGalleryPage() {
   return (
     <main>
       <Navigation />
-      <section className="p-8">
+      <section className="p-8 pt-24">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-800">IP NFT Gallery</h1>
-            <p className="text-gray-600 mt-2">
+            {/* <p className="text-gray-600 mt-2">
               {ipnfts.length === 0 ? 'No IP NFTs found' : `${ipnfts.length} IP NFT${ipnfts.length !== 1 ? 's' : ''} found`}
-            </p>
+            </p> */}
           </div>
           <button 
             onClick={handleRefresh} 
@@ -579,7 +650,7 @@ export default function IPGalleryPage() {
             {ipnfts.map(ip => (
               <div key={ip.tokenId} className="group p-6 border border-gray-200 rounded-xl shadow-sm bg-white hover:shadow-md transition-all duration-200 hover:border-blue-300">
                 <div className="flex items-start justify-between mb-3">
-                  <h3 className="font-bold text-lg text-gray-800 group-hover:text-blue-600 transition-colors">
+                  <h3 className="font-bold text-lg text-gray-800 group-hover:text-blue-600 transition-colors cursor-pointer" onClick={() => openIPDetails(ip)}>
                     {ip.metadata?.title || `IP NFT #${ip.tokenId}`}
                   </h3>
                   <span className="text-sm font-mono text-gray-400 bg-gray-100 px-2 py-1 rounded">
@@ -620,6 +691,30 @@ export default function IPGalleryPage() {
                       <span>Type: {ip.metadata.ip_type}</span>
                     </div>
                   )}
+
+                  {/* Quick Actions */}
+                  <div className="flex space-x-2 pt-2">
+                    <button
+                      onClick={() => openIPDetails(ip)}
+                      className="flex-1 px-3 py-2 bg-blue-50 text-blue-600 text-xs rounded-lg hover:bg-blue-100 transition-colors flex items-center justify-center space-x-1"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                      <span>Details</span>
+                    </button>
+                    <button
+                      onClick={() => openDisputeModal(ip)}
+                      className="flex-1 px-3 py-2 bg-red-50 text-red-600 text-xs rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center space-x-1"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                      <span>Report</span>
+                    </button>
+                  </div>
+
                   {/* License Offers */}
                   <div className="mt-4">
                     <div className="flex items-center justify-between">
@@ -677,8 +772,8 @@ export default function IPGalleryPage() {
 
       {/* Derivative Creation Modal */}
       {showDerivativeModal && selectedIP && (
-        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl modal-content">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-gray-900">Create Derivative IP</h2>
@@ -875,6 +970,210 @@ export default function IPGalleryPage() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dispute Creation Modal */}
+      {showDisputeModal && selectedIP && (
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-lg w-full shadow-2xl modal-content">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">Report IP Issue</h2>
+                <button
+                  onClick={() => setShowDisputeModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                <h3 className="font-semibold text-gray-800 mb-2">IP Details</h3>
+                <p className="text-sm text-gray-600">Title: {selectedIP.metadata?.title || `IP #${selectedIP.tokenId}`}</p>
+                <p className="text-sm text-gray-500">Token ID: #{selectedIP.tokenId}</p>
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Reason for Report *
+                </label>
+                <textarea
+                  value={disputeReason}
+                  onChange={(e) => setDisputeReason(e.target.value)}
+                  rows={4}
+                  placeholder="Please describe the issue or concern with this IP..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                  required
+                />
+              </div>
+
+              <div className="text-xs text-gray-500 mb-6 p-3 bg-yellow-50 rounded-lg">
+                <p>⚠️ <strong>Note:</strong> You need at least 100 governance tokens to create a dispute.</p>
+                <p>Disputes will be reviewed by the community and may result in IP suspension if valid.</p>
+              </div>
+
+              <div className="flex space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowDisputeModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateDispute}
+                  disabled={isCreatingDispute || !disputeReason.trim()}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isCreatingDispute ? 'Creating...' : 'Submit Report'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* IP Details Modal */}
+      {showIPDetailsModal && selectedIP && (
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl modal-content">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">IP Details</h2>
+                <button
+                  onClick={() => setShowIPDetailsModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Left Column - Basic Info */}
+                <div className="space-y-4">
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h3 className="font-semibold text-gray-800 mb-3">Basic Information</h3>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Token ID:</span>
+                        <span className="font-mono text-gray-800">#{selectedIP.tokenId}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Title:</span>
+                        <span className="font-medium text-gray-800">{selectedIP.metadata?.title || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Type:</span>
+                        <span className="font-medium text-gray-800">{selectedIP.metadata?.ip_type || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Created:</span>
+                        <span className="font-medium text-gray-800">{selectedIP.metadata?.date_of_creation ? formatDate(selectedIP.metadata.date_of_creation) : 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Version:</span>
+                        <span className="font-medium text-gray-800">{selectedIP.metadata?.version || 'N/A'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {selectedIP.metadata?.description && (
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h3 className="font-semibold text-gray-800 mb-3">Description</h3>
+                      <p className="text-gray-700 text-sm leading-relaxed">{selectedIP.metadata.description}</p>
+                    </div>
+                  )}
+
+                  {selectedIP.metadata?.keywords && selectedIP.metadata.keywords.length > 0 && (
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h3 className="font-semibold text-gray-800 mb-3">Keywords</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedIP.metadata.keywords.map((keyword, index) => (
+                          <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                            {keyword}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right Column - Technical Details & Actions */}
+                <div className="space-y-4">
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h3 className="font-semibold text-gray-800 mb-3">Technical Details</h3>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Content Hash:</span>
+                        <span className="font-mono text-gray-800 text-xs">{formatAddress(selectedIP.contentHash)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Metadata URI:</span>
+                        <span className="font-mono text-gray-800 text-xs">{formatAddress(selectedIP.metadataUri)}</span>
+                      </div>
+                      {selectedIP.transactionHash && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Transaction:</span>
+                          <span className="font-mono text-gray-800 text-xs">{formatAddress(selectedIP.transactionHash)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {selectedIP.metadata?.authors && selectedIP.metadata.authors.length > 0 && (
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h3 className="font-semibold text-gray-800 mb-3">Authors</h3>
+                      <div className="space-y-2">
+                        {selectedIP.metadata.authors.map((author, index) => (
+                          <div key={index} className="text-sm">
+                            <div className="font-medium text-gray-800">{author.name}</div>
+                            {author.affiliation && <div className="text-gray-600 text-xs">{author.affiliation}</div>}
+                            {author.orcid && <div className="text-gray-500 text-xs">ORCID: {author.orcid}</div>}
+                            <div className="text-gray-500 text-xs font-mono">{formatAddress(author.wallet)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h3 className="font-semibold text-gray-800 mb-3">Quick Actions</h3>
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => {
+                          setShowIPDetailsModal(false)
+                          openDerivativeModal(selectedIP)
+                        }}
+                        className="w-full px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        <span>Create Derivative</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowIPDetailsModal(false)
+                          openDisputeModal(selectedIP)
+                        }}
+                        className="w-full px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center space-x-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        </svg>
+                        <span>Report Issue</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

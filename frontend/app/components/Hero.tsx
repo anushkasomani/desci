@@ -2,13 +2,115 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import { ethers } from 'ethers'
+import { DESCI_ADDRESS, Desci_ABI } from '../config/contracts'
 
 export default function Hero() {
   const [mounted, setMounted] = useState(false)
+  const [userAddress, setUserAddress] = useState<string>('')
+  const [tokenBalance, setTokenBalance] = useState<string>('0')
+  const [isMinting, setIsMinting] = useState(false)
+  const [mintError, setMintError] = useState<string>('')
+
+  const isValidDesciAddress = !!DESCI_ADDRESS && ethers.isAddress(DESCI_ADDRESS)
 
   useEffect(() => {
     setMounted(true)
+    getWalletAddress()
   }, [])
+
+  const getWalletAddress = async () => {
+    try {
+      const ethereum = (typeof window !== 'undefined' ? (window as any).ethereum : undefined)
+      if (ethereum) {
+        const provider = new ethers.BrowserProvider(ethereum)
+        const accounts = await provider.listAccounts()
+        if (accounts.length > 0) {
+          setUserAddress(accounts[0].address)
+          if (isValidDesciAddress) {
+            fetchTokenBalance(accounts[0].address)
+          }
+        }
+      }
+    } catch (error) {
+      console.log('No wallet connected')
+    }
+  }
+
+  const fetchTokenBalance = async (address: string) => {
+    try {
+      if (!isValidDesciAddress) return
+      
+      const ethereum = (typeof window !== 'undefined' ? (window as any).ethereum : undefined)
+      if (!ethereum) return
+
+      const provider = new ethers.BrowserProvider(ethereum)
+      const contract = new ethers.Contract(DESCI_ADDRESS, Desci_ABI, provider)
+      const balance = await contract.balanceOf(address)
+      setTokenBalance(ethers.formatEther(balance))
+    } catch (error) {
+      console.error('Failed to fetch token balance:', error)
+    }
+  }
+
+  const handleMintTokens = async () => {
+    try {
+      setIsMinting(true)
+      setMintError('')
+
+      const ethereum = (typeof window !== 'undefined' ? (window as any).ethereum : undefined)
+      if (!ethereum) {
+        throw new Error('No wallet found. Please install MetaMask or a compatible wallet.')
+      }
+
+      if (!isValidDesciAddress) {
+        throw new Error('Governance contract address is missing or invalid. Set NEXT_PUBLIC_DESCI_CONTRACT_ADDRESS to a valid address.')
+      }
+
+      const provider = new ethers.BrowserProvider(ethereum)
+      await provider.send('eth_requestAccounts', [])
+      const signer = await provider.getSigner()
+      const currentAddress = await signer.getAddress()
+      
+      const contract = new ethers.Contract(DESCI_ADDRESS, Desci_ABI, signer)
+      
+      // Mint price is 0.1 SEI
+      const mintPrice = ethers.parseEther('0.1')
+      
+      const tx = await contract.mintGovernanceTokens({ value: mintPrice })
+      await tx.wait()
+      
+      // Refresh balance
+      await fetchTokenBalance(currentAddress)
+      alert('Successfully minted 100 governance tokens!')
+      
+    } catch (error: any) {
+      console.error('Failed to mint tokens:', error)
+      const message: string = error?.reason || error?.shortMessage || error?.message || 'Failed to mint tokens'
+      // Map ENS unsupported errors to a clearer message
+      const friendly = /does not support ENS|UNSUPPORTED_OPERATION/i.test(message)
+        ? 'This network does not support ENS. Please ensure the governance contract address is a valid 0x address and configured in NEXT_PUBLIC_DESCI_CONTRACT_ADDRESS.'
+        : message
+      setMintError(friendly)
+    } finally {
+      setIsMinting(false)
+    }
+  }
+
+  const connectWallet = async () => {
+    try {
+      const ethereum = (typeof window !== 'undefined' ? (window as any).ethereum : undefined)
+      if (!ethereum) {
+        alert('Please install MetaMask or a compatible wallet')
+        return
+      }
+
+      await ethereum.request({ method: 'eth_requestAccounts' })
+      await getWalletAddress()
+    } catch (error) {
+      console.error('Failed to connect wallet:', error)
+    }
+  }
 
   return (
     <div className="relative overflow-hidden gradient-bg min-h-screen flex items-center">
@@ -52,7 +154,7 @@ export default function Hero() {
                 </svg>
               </span>
             </Link>
-            <Link href="/gallery" className="btn-secondary text-lg px-10 py-4 group">
+            <Link href="/ip-gallery" className="btn-secondary text-lg px-10 py-4 group">
               <span className="flex items-center space-x-3">
                 <span>Explore Gallery</span>
                 <svg className="w-5 h-5 transition-transform duration-300 group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -68,6 +170,70 @@ export default function Hero() {
                 </svg>
               </span>
             </Link>
+          </div>
+
+          {/* Governance Token Section */}
+          <div className={`max-w-2xl mx-auto mb-16 ${mounted ? 'animate-fade-in animation-delay-700' : 'opacity-0'}`}>
+            <div className="bg-white/80 backdrop-blur-md border border-white/30 rounded-2xl p-8 shadow-xl">
+              <div className="text-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">Governance Tokens</h2>
+                <p className="text-gray-600">Participate in platform decisions and dispute resolution</p>
+              </div>
+              
+              {!userAddress ? (
+                <button
+                  onClick={connectWallet}
+                  className="w-full px-6 py-3 bg-gradient-to-r from-primary-600 to-secondary-600 text-white font-semibold rounded-xl hover:from-primary-700 hover:to-secondary-700 transition-all duration-300 transform hover:scale-105 shadow-lg"
+                >
+                  Connect Wallet to Mint Tokens
+                </button>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <span className="text-gray-700 font-medium">Your Balance:</span>
+                    <span className="text-2xl font-bold text-primary-600">{tokenBalance} DESCI</span>
+                  </div>
+
+                  {!isValidDesciAddress && (
+                    <div className="text-yellow-800 text-sm text-center p-3 bg-yellow-50 rounded-lg">
+                      Governance contract address is not configured or invalid. Set NEXT_PUBLIC_DESCI_CONTRACT_ADDRESS to a valid 0x address.
+                    </div>
+                  )}
+                  
+                  <button
+                    onClick={handleMintTokens}
+                    disabled={isMinting || !isValidDesciAddress}
+                    className="w-full px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white font-semibold rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isMinting ? (
+                      <span className="flex items-center justify-center space-x-2">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        <span>Minting...</span>
+                      </span>
+                    ) : (
+                      <span className="flex items-center justify-center space-x-2">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        <span>Mint 100 Tokens (0.1 SEI)</span>
+                      </span>
+                    )}
+                  </button>
+                  
+                  {mintError && (
+                    <div className="text-red-600 text-sm text-center p-3 bg-red-50 rounded-lg">
+                      {mintError}
+                    </div>
+                  )}
+                  
+                  <div className="text-xs text-gray-500 text-center">
+                    <p>• 100 governance tokens per mint</p>
+                    <p>• Minimum 100 tokens required to vote on disputes</p>
+                    <p>• Participate in platform governance and content review</p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Trust indicators */}
@@ -119,7 +285,7 @@ export default function Hero() {
                 $50M+
               </div>
               <div className="text-gray-600 text-lg font-medium">Value Generated</div>
-              <div className="absolute inset-0 bg-gradient-to-r from-primary-100 to-secondary-100 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10 blur-xl"></div>
+              <div className="absolute inset-0 bg-gradient-to-r from-primary-100 to secondary-100 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10 blur-xl"></div>
             </div>
           </div>
         </div>
