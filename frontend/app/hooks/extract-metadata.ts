@@ -13,11 +13,11 @@ export const uploadMetadataFile = async (file: File): Promise<MetadataResponse> 
     formDataForSummary.append('file', file);
 
     const [metadataRes, summaryRes] = await Promise.all([
-      fetch('https://sei-agents-metadata.onrender.com/metadata', {
+      fetch('https://sei-agents-metadata.onrender.com/paper/metadata', {
         method: 'POST',
         body: formDataForMetadata,
       }),
-      fetch('https://sei-agents-metadata.onrender.com/summary', {
+      fetch('https://sei-agents-metadata.onrender.com/paper/summary', {
         method: 'POST',
         body: formDataForSummary,
       })

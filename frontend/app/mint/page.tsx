@@ -308,7 +308,7 @@ export default function MintPage() {
             ipNFTId: ipTokenId.toString(),
             owner: userAddress,
             createdAt: new Date().toISOString(),
-            price: "0.001 ETH"
+            price: "0.001 SEI"
           }
           console.log('License metadata created:', licenseMetadata)
           console.log('Uploading license metadata to IPFS...')
