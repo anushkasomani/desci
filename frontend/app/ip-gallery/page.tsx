@@ -216,14 +216,14 @@ export default function IPGalleryPage() {
       console.log('Transaction sent:', tx.hash)
       const receipt = await tx.wait()
       console.log('License purchased. Receipt:', receipt)
-      alert('License NFT minted successfully!')
-      try {
-        if (process.env.NEXT_PUBLIC_LIT_ENABLED === 'true' && LICENSE_NFT_ADDRESS) {
-          const keyB64 = await getDecryptionKeyForIP(tokenId, LICENSE_NFT_ADDRESS)
-          setDecryptionKeys(prev => ({ ...prev, [tokenId]: keyB64 }))
-          
-        }
-      } catch (e) { console.warn('Lit key retrieval skipped/failed:', e) }
+      alert('License NFT minted successfully')
+      // try {
+      //   if (process.env.NEXT_PUBLIC_LIT_ENABLED === 'true' && LICENSE_NFT_ADDRESS) {
+      //     const keyB64 = await getDecryptionKeyForIP(tokenId, LICENSE_NFT_ADDRESS)
+      //     setDecryptionKeys(prev => ({ ...prev, [tokenId]: keyB64 }))
+      //     console.log(decryptionKeys[tokenId])
+      //   }
+      // } catch (e) { console.warn('Lit key retrieval skipped/failed:', e) }
     } catch (e: any) {
       console.error('Failed to mint license token:', e)
       setError(e?.message || 'Failed to mint license token')
@@ -568,31 +568,31 @@ export default function IPGalleryPage() {
     return text.length > max ? text.slice(0, max) + '…' : text
   }
 
-  const decryptAndDownload = async (ip: IPNFT) => {
-    try {
-      if (!ip.metadata?.encryption?.encrypted) return
-      const keyB64 = decryptionKeys[ip.tokenId]
-      if (!keyB64) { alert('No decryption key found. Ensure you hold a license.'); return }
-      const ivB64 = ip.metadata.encryption.ivB64 || ''
-      const res = await fetch(ip.metadata.permanent_content_reference.uri)
-      const encBuf = await res.arrayBuffer()
-      const keyRaw = Uint8Array.from(atob(keyB64), c => c.charCodeAt(0))
-      const iv = Uint8Array.from(atob(ivB64), c => c.charCodeAt(0))
-      const cryptoKey = await crypto.subtle.importKey('raw', keyRaw, { name: 'AES-GCM' }, false, ['decrypt'])
-      const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, encBuf)
-      const blob = new Blob([plainBuf])
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `ip_${ip.tokenId}_decrypted`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
-    } catch (e) {
-      alert('Failed to decrypt.')
-    }
-  }
+  // const decryptAndDownload = async (ip: IPNFT) => {
+  //   try {
+  //     if (!ip.metadata?.encryption?.encrypted) return
+  //     const keyB64 = decryptionKeys[ip.tokenId]
+  //     if (!keyB64) { alert('No decryption key found. Ensure you hold a license.'); return }
+  //     const ivB64 = ip.metadata.encryption.ivB64 || ''
+  //     const res = await fetch(ip.metadata.permanent_content_reference.uri)
+  //     const encBuf = await res.arrayBuffer()
+  //     const keyRaw = Uint8Array.from(atob(keyB64), c => c.charCodeAt(0))
+  //     const iv = Uint8Array.from(atob(ivB64), c => c.charCodeAt(0))
+  //     const cryptoKey = await crypto.subtle.importKey('raw', keyRaw, { name: 'AES-GCM' }, false, ['decrypt'])
+  //     const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, encBuf)
+  //     const blob = new Blob([plainBuf])
+  //     const url = URL.createObjectURL(blob)
+  //     const a = document.createElement('a')
+  //     a.href = url
+  //     a.download = `ip_${ip.tokenId}_decrypted`
+  //     document.body.appendChild(a)
+  //     a.click()
+  //     a.remove()
+  //     URL.revokeObjectURL(url)
+  //   } catch (e) {
+  //     alert('Failed to decrypt.')
+  //   }
+  // }
 
   const handleRefresh = () => {
     fetchIPNFTs(true)

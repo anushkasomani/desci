@@ -186,12 +186,14 @@ export default function MintV2Page() {
         contentCid = cid
         contentGatewayUrl = `https://moccasin-broad-kiwi-732.mypinata.cloud/ipfs/${cid}`
         encryption = { encrypted: true, algorithm: 'AES-GCM', ivB64, notes: 'Content encrypted client-side. Store key securely. Key distribution is out-of-band.' }
+        //will remove this after testing
+        console.log('encryption', encryption)
         // Save key to Lit if enabled (gated by LicenseNFT ownership)
-        try {
-          if (LICENSE_NFT_ADDRESS && process.env.NEXT_PUBLIC_LIT_ENABLED === 'true') {
-            await saveDecryptionKeyForIP('pending', keyB64, LICENSE_NFT_ADDRESS)
-          }
-        } catch {}
+        // try {
+        //   if (LICENSE_NFT_ADDRESS && process.env.NEXT_PUBLIC_LIT_ENABLED === 'true') {
+        //     await saveDecryptionKeyForIP('pending', keyB64, LICENSE_NFT_ADDRESS)
+        //   }
+        // } catch {}
       }
 
       // build metadata
