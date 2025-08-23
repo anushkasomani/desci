@@ -242,7 +242,7 @@ export function useMintWizard() {
                 if (!res.ok) throw new Error("Failed to upload encrypted file to IPFS");
                 const { cid } = await res.json();
                 contentCid = cid;
-                encryption = { encrypted: true, algorithm: "AES-GCM", ivB64 };
+                encryption = { encrypted: true, algorithm: "AES-GCM", ivB64, keyB64 };
                 console.log("DECRYPTION KEY (SAVE THIS!):", keyB64);
             }
 
@@ -319,7 +319,13 @@ export function useMintWizard() {
                 for (const licenseId of selectedLicenses) {
                     const license = licenseSuggestions.find(l => l.license_id === licenseId);
                     if (license) {
-                        const licenseMeta = { name: license.license_name, description: `License for IP #${ipTokenId}`, ...license };
+                        // Create license metadata without decryption info
+                        const licenseMeta = { 
+                            name: license.license_name, 
+                            description: `License for IP #${ipTokenId}`, 
+                            ...license 
+                        };
+                        
                         const lRes = await fetch("/api/pin-json", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(licenseMeta) });
                         if (!lRes.ok) throw new Error("Failed to pin license metadata.");
                         const { cid: lCid } = await lRes.json();
@@ -327,10 +333,69 @@ export function useMintWizard() {
                         const priceInWei = ethers.parseEther(String(license.royalties.mint_fee));
                         const ltx = await licenseContract.createLicenseOffer(ipTokenId, priceInWei, lUri, 0);
                         await ltx.wait();
+                        
+                        // Store decryption key in our private mapping for private files
+                        if (privacy === 'private' && encryption.encrypted) {
+                            const decryptionInfo = {
+                                key: encryption.keyB64,
+                                algorithm: encryption.algorithm,
+                                iv: encryption.ivB64,
+                                contentCid: contentCid
+                            };
+                            
+                            // Store the key mapping (this would be done server-side in production)
+                            await fetch("/api/store-decryption-key", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                    ipTokenId: ipTokenId.toString(),
+                                    decryptionInfo
+                                })
+                            });
+                        }
                     }
                 }
             }
 
+            // Call vector search API to index the new IP
+            try {
+                const namespace = ipType === 'research_paper' ? 'paper' : 
+                                ipType === 'dataset' ? 'dataset' : 'algo';
+                
+                const summary = ipType === 'research_paper' ? summaryResponse?.abstract || form.description :
+                               ipType === 'dataset' ? summaryResponse?.concise_summary || form.description :
+                               summaryResponse?.chemical_compound?.description || form.description;
+                
+                // Create form data as expected by the API
+                const formData = new FormData();
+                formData.append('id', ipTokenId.toString());
+                formData.append('summary', summary || form.description);
+                formData.append('title', form.title);
+                formData.append('namespace', namespace);
+                
+                console.log('Indexing IP in vector search:', {
+                    id: ipTokenId.toString(),
+                    summary: summary || form.description,
+                    title: form.title,
+                    namespace: namespace
+                });
+                
+                const response = await fetch('https://sei-vectorsearch.onrender.com/insert', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.warn(`Failed to index IP ${ipTokenId}:`, response.status, errorText);
+                } else {
+                    const result = await response.json();
+                    console.log(`IP ${ipTokenId} indexed successfully:`, result);
+                }
+            } catch (e) {
+                console.warn('Failed to index IP in vector search:', e);
+            }
+            
             alert("IP Asset Minted Successfully!");
             setStep('chooseType'); setIpType(null); setPrimaryFile(null); setForm({ title: '', description: '', aiSummary: '', keywords: '', authors: [{ name: '' }], owner: userAddr }); setLicenseSuggestions([]); setSelectedLicenses([]);
         } catch (e: any) {

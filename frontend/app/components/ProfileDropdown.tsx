@@ -51,6 +51,9 @@ export function ProfileDropdown({ userAddress, tokenBalance, onGovernanceClick }
             <Link href="/dashboard" className="flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors">
                 <BanknotesIcon className="w-5 h-5"/> My IP Assets
             </Link>
+            <Link href="/my-licenses" className="flex items-center gap-3 w-full text-left px-3 py-2.5 mt-1 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors">
+                <BanknotesIcon className="w-5 h-5"/> My Licenses
+            </Link>
             <button onClick={onGovernanceClick} className="flex items-center gap-3 w-full text-left px-3 py-2.5 mt-1 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors">
                 <UsersIcon className="w-5 h-5"/> Join Governance
             </button>

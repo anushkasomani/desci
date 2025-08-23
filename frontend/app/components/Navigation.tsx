@@ -4,14 +4,16 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useWallet } from '../hooks/useWallet'
 import { motion } from 'framer-motion'
-import { CubeTransparentIcon } from '@heroicons/react/24/outline'
+import { CubeTransparentIcon, SparklesIcon } from '@heroicons/react/24/outline'
 import { ProfileDropdown } from './ProfileDropdown'
 import { GovernanceModal } from './GovernanceModal'
+import SearchAgent from './SearchAgent'
 
 export function Navigation() {
   // REMOVED: All scroll-related state and effects are now gone.
   const { userAddress, tokenBalance, isConnecting, connectWallet } = useWallet()
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
 
   return (
     <>
@@ -32,7 +34,15 @@ export function Navigation() {
             <div className="hidden md:flex items-center space-x-6 text-sm font-medium text-gray-400">
               <Link href="/ip-gallery" className="hover:text-white transition-colors">IP Gallery</Link>
               <Link href="/mint-v2" className="hover:text-white transition-colors">Mint</Link>
+              <Link href="/my-licenses" className="hover:text-white transition-colors">My Licenses</Link>
               <Link href="/validators" className="hover:text-white transition-colors">Governance</Link>
+              <button
+                onClick={() => setIsSearchOpen(true)}
+                className="p-2 hover:bg-gray-800/50 rounded-full transition-colors"
+                title="AI Search Assistant"
+              >
+                <SparklesIcon className="w-5 h-5 text-indigo-400 hover:text-cyan-400" />
+              </button>
             </div>
 
             <div>
@@ -58,6 +68,7 @@ export function Navigation() {
       </motion.nav>
       
       <GovernanceModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <SearchAgent isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
     </>
   )
 }
