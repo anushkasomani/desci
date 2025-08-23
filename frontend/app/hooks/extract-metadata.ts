@@ -4,7 +4,7 @@ interface MetadataResponse {
   error?: string;
 }
 
-export const uploadMetadataFile = async (file: File): Promise<MetadataResponse> => {
+export const uploadMetadataFile = async (file: File, type: 'research_paper' | 'dataset' = 'research_paper'): Promise<MetadataResponse> => {
   try {
     const formDataForMetadata = new FormData();
     formDataForMetadata.append('file', file);
@@ -12,12 +12,20 @@ export const uploadMetadataFile = async (file: File): Promise<MetadataResponse> 
     const formDataForSummary = new FormData();
     formDataForSummary.append('file', file);
 
+    // Choose endpoints based on type
+    const metadataEndpoint = type === 'dataset'
+      ? 'https://sei-agents-metadata.onrender.com/dataset/metadata'
+      : 'https://sei-agents-metadata.onrender.com/paper/metadata';
+    const summaryEndpoint = type === 'dataset'
+      ? 'https://sei-agents-metadata.onrender.com/dataset/summary'
+      : 'https://sei-agents-metadata.onrender.com/paper/summary';
+
     const [metadataRes, summaryRes] = await Promise.all([
-      fetch('https://sei-agents-metadata.onrender.com/paper/metadata', {
+      fetch(metadataEndpoint, {
         method: 'POST',
         body: formDataForMetadata,
       }),
-      fetch('https://sei-agents-metadata.onrender.com/paper/summary', {
+      fetch(summaryEndpoint, {
         method: 'POST',
         body: formDataForSummary,
       })

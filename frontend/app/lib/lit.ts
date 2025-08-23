@@ -19,7 +19,7 @@ export async function saveDecryptionKeyForIP(ipTokenId: string | number, base64K
   const { LitNodeClient, checkAndSignAuthMessage } = await loadLit()
   const client = new LitNodeClient({ litNetwork: LIT_NETWORK.DatilDev}) // Lit testnet
   await client.connect()
-  // @ts-ignore – Lit types vary across versions; our chain is Sei testnet
+  // @ts-ignore
   const authSig = await checkAndSignAuthMessage({ chain: 'seiTestnet' })
 
   const accessControlConditions: AccessControlCondition[] = [

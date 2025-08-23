@@ -1,32 +1,28 @@
 'use client'
-import { IpType } from '../types'
-
-type Props = { value: IpType | null; onChange: (t: IpType) => void; onNext: () => void }
-
-const options: { key: IpType; label: string; desc: string }[] = [
-  { key: 'research_paper', label: 'Research Paper', desc: 'PDF, DOCX, manuscript or preprint' },
-  { key: 'dataset', label: 'Dataset', desc: 'CSV, JSON, Parquet, etc.' },
-  { key: 'formula_method', label: 'Formula / Method', desc: 'LaTeX, markdown, notebooks' },
-  { key: 'other', label: 'Other', desc: 'Anything else' },
-]
-
-export default function ChooseType({ value, onChange, onNext }: Props) {
-  return (
-    <div>
-      <h2 className="text-2xl font-semibold text-gray-900 mb-4">What is your IP type?</h2>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {options.map(opt => (
-          <button key={opt.key} onClick={() => onChange(opt.key)} className={`p-6 rounded-xl border text-left transition-all ${value === opt.key ? 'border-blue-600 ring-2 ring-blue-200' : 'border-gray-200 hover:border-blue-300 hover:shadow-md'}`}>
-            <div className="text-lg font-medium text-gray-800">{opt.label}</div>
-            <div className="text-xs text-gray-500 mt-1">{opt.desc}</div>
-          </button>
-        ))}
-      </div>
-      <div className="mt-6 flex justify-end">
-        <button disabled={!value} onClick={onNext} className={`px-5 py-2 rounded-lg text-white ${value ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-300 cursor-not-allowed'}`}>Continue</button>
-      </div>
-    </div>
-  )
+import { IpType } from "../../types/mint";
+import { DocumentTextIcon, CircleStackIcon, BeakerIcon, SparklesIcon } from "@heroicons/react/24/outline";
+const options = [
+    { key: "research_paper" as IpType, label: "Research Paper", desc: "PDF, manuscript or preprint", icon: DocumentTextIcon },
+    { key: "dataset" as IpType, label: "Dataset", desc: "CSV, JSON, Parquet, etc.", icon: CircleStackIcon },
+    { key: "formula_method" as IpType, label: "Formula / Method", desc: "Chemical structures, algorithms", icon: BeakerIcon },
+    { key: "other" as IpType, label: "Other", desc: "Any other form of IP", icon: SparklesIcon }
+];
+type Props = { onSelect: (type: IpType) => void }
+export function ChooseType({ onSelect }: Props) {
+    return (
+        <div>
+            <h2 className="text-2xl font-bold text-white mb-2">Select your IP Type</h2>
+            <p className="text-gray-400 mb-8">What kind of intellectual property are you tokenizing today?</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {options.map(opt => (
+                    <button key={opt.key} onClick={() => onSelect(opt.key)} className="group text-left p-6 bg-gray-800/50 border border-gray-700 rounded-lg hover:border-indigo-500 hover:bg-gray-800 transition-all">
+                        <opt.icon className="w-8 h-8 text-cyan-400 mb-3" />
+                        <h3 className="text-lg font-bold text-white">{opt.label}</h3>
+                        <p className="text-sm text-gray-500">{opt.desc}</p>
+                    </button>
+                ))}
+            </div>
+        </div>
+    )
 }
-
-
+export default ChooseType;
