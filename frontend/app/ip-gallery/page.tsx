@@ -7,7 +7,7 @@ import Footer from '../components/Footer'
 import { GalleryGrid } from '../components/gallery/GalleryGrid'
 import { useIPGallery } from '../hooks/useIPGallery'
 import { IPNFT } from '../types/gallery'
-import { IPDetailsModal } from '../components/gallery/modals/IPDetailsModal'
+import IPDetailsModal from '../components/gallery/modals/IPDetailsModal'
 import { DerivativeModal } from '../components/gallery/modals/DerivativeModal'
 import DisputeModal from '../components/gallery/modals/DisputeModals'
 
@@ -27,6 +27,11 @@ export default function IPGalleryPage() {
         setSelectedIP(null)
     }
 
+    // Separate IPs by type
+    const researchPapers = ipnfts.filter(ip => ip.metadata?.ip_type === 'research_paper');
+    const datasets = ipnfts.filter(ip => ip.metadata?.ip_type === 'dataset');
+    const formulas = ipnfts.filter(ip => ip.metadata?.ip_type === 'formula_method');
+
     return (
         <div className="min-h-screen bg-gray-950">
             <Navigation />
@@ -42,12 +47,38 @@ export default function IPGalleryPage() {
                         </button>
                     </div>
 
-                    <GalleryGrid
-                        ipnfts={ipnfts}
-                        loading={loading}
-                        error={error}
-                        onCardClick={handleOpenModal}
-                    />
+                    {/* Research Papers Section */}
+                    <div className="mb-12">
+                        <h2 className="text-2xl font-bold text-indigo-400 mb-4">Research Papers</h2>
+                        <GalleryGrid
+                            ipnfts={researchPapers}
+                            loading={loading}
+                            error={error}
+                            onCardClick={handleOpenModal}
+                        />
+                    </div>
+
+                    {/* Datasets Section */}
+                    <div className="mb-12">
+                        <h2 className="text-2xl font-bold text-cyan-400 mb-4">Datasets</h2>
+                        <GalleryGrid
+                            ipnfts={datasets}
+                            loading={loading}
+                            error={error}
+                            onCardClick={handleOpenModal}
+                        />
+                    </div>
+
+                    {/* Formulas/Methods Section */}
+                    <div className="mb-12">
+                        <h2 className="text-2xl font-bold text-pink-400 mb-4">Formulas & Methods</h2>
+                        <GalleryGrid
+                            ipnfts={formulas}
+                            loading={loading}
+                            error={error}
+                            onCardClick={handleOpenModal}
+                        />
+                    </div>
                 </div>
             </main>
             <Footer />

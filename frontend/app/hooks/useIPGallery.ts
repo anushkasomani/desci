@@ -26,31 +26,83 @@ async function fetchJsonFromUri(uri: string): Promise<any | null> {
 }
 
 export function useIPGallery() {
+
     const [ipnfts, setIpnfts] = useState<IPNFT[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
-
     const [isBuyingLicense, setIsBuyingLicense] = useState(false)
     const [isCreatingDerivative, setIsCreatingDerivative] = useState(false)
     const [isCreatingDispute, setIsCreatingDispute] = useState(false)
+    const [userLicenses, setUserLicenses] = useState<any[]>([])
 
-    const fetchIPNFTs = useCallback(async () => {
+    // Helper to get SEI explorer URL
+    const getExplorerUrl = (txHash: string) => `https://sei.explorers.guru/transaction/${txHash}`
+
+    // Fetch all IPNFTs, derivatives, license offers, and user licenses
+    const fetchIPNFTs = useCallback(async (userAddress?: string) => {
         setLoading(true)
         setError(null)
         try {
             const query = gql`
               query GetGalleryData {
                 ipminteds(orderBy: tokenId, orderDirection: desc) {
-                  metadataURI, splitter, tokenId, transactionHash
+                  tokenId
+                  author
+                  metadataURI
+                  contentHash
+                  splitter
+                  blockTimestamp
+                  transactionHash
                 }
                 licenseOfferCreateds {
-                  expiry, ipOwner, ipTokenId, licenseURI, offerIndex, priceWei
+                  expiry
+                  ipOwner
+                  ipTokenId
+                  licenseURI
+                  offerIndex
+                  priceWei
+                }
+                licensePurchaseds {
+                  ipTokenId
+                  licenseTokenId
+                  buyer
+                  offerIndex
+                  priceWei
+                }
+                derivativeCreateds {
+                  creator
+                  derivativeTokenId
+                  derivativeType
+                  isCommercial
+                  parentTokenIds
+                  consumedLicenseIds
+                }
+                licenseConsumeds {
+                  licenseTokenId
                 }
               }
             `
-            const data = await request<{ ipminteds: any[], licenseOfferCreateds: any[] }>(GRAPH_URL, query, {}, { Authorization: GRAPH_AUTH })
+            const data = await request<any>(GRAPH_URL, query, {}, { Authorization: GRAPH_AUTH })
 
-            const offersByIp = data.licenseOfferCreateds.reduce((acc, offer) => {
+            // Map consumed licenses for quick lookup
+            const consumedLicenseSet = new Set((data.licenseConsumeds || []).map((l: any) => String(l.licenseTokenId)))
+
+            // Map license NFTs owned by user (filter out consumed)
+            let userLicensesArr: any[] = []
+            if (userAddress) {
+                userLicensesArr = (data.licensePurchaseds || [])
+                    .filter((l: any) => l.buyer?.toLowerCase() === userAddress.toLowerCase() && !consumedLicenseSet.has(String(l.licenseTokenId)))
+                    .map((l: any) => ({
+                        licenseTokenId: l.licenseTokenId,
+                        ipTokenId: l.ipTokenId,
+                        offerIndex: l.offerIndex,
+                        priceWei: l.priceWei
+                    }))
+                setUserLicenses(userLicensesArr)
+            }
+
+            // Map offers by IP
+            const offersByIp = (data.licenseOfferCreateds || []).reduce((acc: any, offer: any) => {
                 const ipId = String(offer.ipTokenId)
                 if (!acc[ipId]) acc[ipId] = []
                 acc[ipId].push({
@@ -62,25 +114,43 @@ export function useIPGallery() {
                     expiry: String(offer.expiry),
                 })
                 return acc
-            }, {} as Record<string, LicenseOffer[]>)
+            }, {})
 
+            // Map derivatives by parentTokenId
+            const derivativesByParent: Record<string, any[]> = {}
+            for (const d of data.derivativeCreateds || []) {
+                for (const parentId of d.parentTokenIds) {
+                    const pid = String(parentId)
+                    if (!derivativesByParent[pid]) derivativesByParent[pid] = []
+                    derivativesByParent[pid].push(d)
+                }
+            }
+
+            // Enrich IPNFTs
             const enrichedNfts = await Promise.all(
-                data.ipminteds.map(async (ip): Promise<IPNFT> => {
+                (data.ipminteds || []).map(async (ip: any) => {
                     const metadata = await fetchJsonFromUri(ip.metadataURI) as IPMetadata | null
                     const offers = offersByIp[String(ip.tokenId)] || []
                     const enrichedOffers = await Promise.all(
-                        offers.map(async (offer) => ({
+                        offers.map(async (offer: any) => ({
                             ...offer,
                             licenseMetadata: await fetchJsonFromUri(offer.licenseURI)
                         }))
                     )
+                    // Derivatives for this IP
+                    const derivatives = derivativesByParent[String(ip.tokenId)] || []
                     return {
                         tokenId: ip.tokenId,
                         metadata,
                         metadataUri: ip.metadataURI,
-                        contentHash: metadata?.permanent_content_reference?.content_hash || '',
+                        contentHash: ip.contentHash || metadata?.permanent_content_reference?.content_hash || '',
                         transactionHash: ip.transactionHash,
+                        explorerUrl: getExplorerUrl(ip.transactionHash),
+                        author: ip.author,
+                        owner: ip.splitter, // or use Transfer events for latest owner
+                        createdAt: ip.blockTimestamp,
                         offers: enrichedOffers,
+                        derivatives,
                     }
                 })
             )
@@ -93,8 +163,21 @@ export function useIPGallery() {
         }
     }, [])
 
+
+    // Get connected user address from wallet
     useEffect(() => {
-        fetchIPNFTs()
+        const getUserAddress = async () => {
+            if (typeof window !== 'undefined' && (window as any).ethereum) {
+                const provider = new ethers.BrowserProvider((window as any).ethereum)
+                const accounts = await provider.send('eth_accounts', [])
+                if (accounts && accounts[0]) {
+                    fetchIPNFTs(accounts[0])
+                    return
+                }
+            }
+            fetchIPNFTs()
+        }
+        getUserAddress()
     }, [fetchIPNFTs])
     
     const getSigner = async (): Promise<ethers.JsonRpcSigner | null> => {
@@ -212,16 +295,17 @@ export function useIPGallery() {
         }
     }, [])
 
-    return { 
-        ipnfts, 
-        loading, 
-        error, 
-        fetchIPNFTs, 
+    return {
+        ipnfts,
+        loading,
+        error,
+        fetchIPNFTs,
         handleBuyLicense,
         handleCreateDerivative,
         handleCreateDispute,
         isBuyingLicense,
         isCreatingDerivative,
-        isCreatingDispute
+        isCreatingDispute,
+        userLicenses, // available license NFTs for connected user
     }
 }

@@ -10,7 +10,7 @@ import { useIPGallery } from '@/app/hooks/useIPGallery'
 type ModalProps = { isOpen: boolean, onClose: () => void, ip: IPNFT }
 
 export function DerivativeModal({ isOpen, onClose, ip }: ModalProps) {
-    const { handleCreateDerivative, isCreatingDerivative } = useIPGallery()
+    const { handleCreateDerivative, isCreatingDerivative, userLicenses } = useIPGallery()
     const [formData, setFormData] = useState<DerivativeFormData>({
         title: `Derivative of: ${ip.metadata?.title || `IP #${ip.tokenId}`}`,
         description: '',
@@ -28,6 +28,21 @@ export function DerivativeModal({ isOpen, onClose, ip }: ModalProps) {
             [name]: isCheckbox ? (e.target as HTMLInputElement).checked : value
         }))
     }
+
+    const handleLicenseSelect = (licenseTokenId: string) => {
+        setFormData(prev => {
+            const exists = prev.licenseTokenIds.includes(licenseTokenId)
+            return {
+                ...prev,
+                licenseTokenIds: exists
+                    ? prev.licenseTokenIds.filter(id => id !== licenseTokenId)
+                    : [...prev.licenseTokenIds, licenseTokenId]
+            }
+        })
+    }
+
+    // Only show license tokens for this IP and owned by user
+    const filteredLicenses = userLicenses?.filter(l => String(l.ipTokenId) === String(ip.tokenId)) || []
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -89,6 +104,27 @@ export function DerivativeModal({ isOpen, onClose, ip }: ModalProps) {
                                 <div className="p-4 bg-gray-800/30 rounded-lg">
                                      <p className="text-sm text-gray-400">Parent IP Asset:</p>
                                      <p className="font-semibold text-white mt-1">#{ip.tokenId}: {ip.metadata?.title}</p>
+                                </div>
+                                <div className="mt-6">
+                                    <h3 className="text-sm font-semibold text-white mb-2">Select License NFTs to use</h3>
+                                    {filteredLicenses.length > 0 ? (
+                                        <div className="space-y-2">
+                                            {filteredLicenses.map(l => (
+                                                <label key={l.licenseTokenId} className="flex items-center gap-2 p-2 bg-gray-800/40 rounded-lg cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={formData.licenseTokenIds.includes(l.licenseTokenId)}
+                                                        onChange={() => handleLicenseSelect(l.licenseTokenId)}
+                                                        className="h-4 w-4 text-indigo-600 border-gray-600 rounded bg-gray-800 focus:ring-indigo-500"
+                                                    />
+                                                    <span className="text-xs text-white font-mono">License #{l.licenseTokenId}</span>
+                                                    <span className="text-xs text-gray-400">IP #{l.ipTokenId}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="text-gray-500">No available license NFTs for this IP. You must own a valid license to create a derivative if you are not the IP owner.</p>
+                                    )}
                                 </div>
                             </div>
                             <div className="mt-8 flex justify-end gap-4">

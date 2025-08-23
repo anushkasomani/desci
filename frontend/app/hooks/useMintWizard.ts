@@ -1,23 +1,49 @@
-// hooks/useMintWizard.ts
+
 'use client'
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { ethers } from 'ethers';
 import { IPNFT_ADDRESS, IPNFT_ABI, LICENSE_NFT_ADDRESS, LicenseNFT_ABI } from '../config/contracts';
 import type { IpType, WizardStepId, FormState, Author, LicenseSuggestion } from '../types/mint';
 
 type MetadataResponse = { success: boolean; data?: any; error?: string };
 
-// All API and helper functions are now fully implemented inside the hook's scope.
 const API_BASE_METADATA = "https://sei-agents-metadata.onrender.com";
 const API_BASE_LICENSE = "https://sei-licence.onrender.com";
 
+// --- API Fetcher Functions ---
 async function fetchPaperExtraction(file: File): Promise<MetadataResponse> {
     const fd = new FormData();
     fd.append("file", file);
     const [mRes, sRes] = await Promise.all([
         fetch(`${API_BASE_METADATA}/paper/metadata`, { method: "POST", body: fd }),
         fetch(`${API_BASE_METADATA}/paper/summary`, { method: "POST", body: fd })
+    ]);
+    if (!mRes.ok || !sRes.ok) throw new Error(`AI API failed. Statuses: ${mRes.status}, ${sRes.status}`);
+    const [mJson, sJson] = await Promise.all([mRes.json(), sRes.json()]);
+    return { success: true, data: { ...mJson, ai_summary: sJson, raw: { metadata: mJson, summary: sJson } } };
+}
+
+async function fetchDatasetExtraction(file: File, description: string): Promise<MetadataResponse> {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("description", description || "");
+    const [mRes, sRes] = await Promise.all([
+        fetch(`${API_BASE_METADATA}/dataset/metadata`, { method: "POST", body: fd }),
+        fetch(`${API_BASE_METADATA}/dataset/summary`, { method: "POST", body: fd })
+    ]);
+    if (!mRes.ok || !sRes.ok) throw new Error(`AI API failed. Statuses: ${mRes.status}, ${sRes.status}`);
+    const [mJson, sJson] = await Promise.all([mRes.json(), sRes.json()]);
+    return { success: true, data: { ...mJson, ai_summary: sJson, raw: { metadata: mJson, summary: sJson } } };
+}
+
+async function fetchFormulaExtraction(imageFile: File, userInput: string): Promise<MetadataResponse> {
+    const fd = new FormData();
+    fd.append("image", imageFile);
+    fd.append("user_input", userInput || "");
+    const [mRes, sRes] = await Promise.all([
+        fetch(`${API_BASE_METADATA}/formula/metadata`, { method: "POST", body: fd }),
+        fetch(`${API_BASE_METADATA}/formula/summary`, { method: "POST", body: fd })
     ]);
     if (!mRes.ok || !sRes.ok) throw new Error(`AI API failed. Statuses: ${mRes.status}, ${sRes.status}`);
     const [mJson, sJson] = await Promise.all([mRes.json(), sRes.json()]);
@@ -49,17 +75,19 @@ async function encryptFileAesGcm(file: File): Promise<{ encrypted: Blob; keyB64:
     return { encrypted, keyB64, ivB64, sha256Hex: hashHex };
 }
 
-
 export function useMintWizard() {
     const [step, setStep] = useState<WizardStepId>('chooseType');
     const [ipType, setIpType] = useState<IpType | null>(null);
     const [useAI, setUseAI] = useState<boolean>(true);
     const [primaryFile, setPrimaryFile] = useState<File | null>(null);
+    const [datasetDescription, setDatasetDescription] = useState("");
+    const [formulaNote, setFormulaNote] = useState("");
     const [summaryResponse, setSummaryResponse] = useState<any>(null);
     const [metaResponse, setMetaResponse] = useState<any>(null);
     const [form, setForm] = useState<FormState>({
         title: '', description: '', aiSummary: '', keywords: '',
-        authors: [{ name: '' }]
+        authors: [{ name: '' }],
+        owner: ''
     });
     const [privacy, setPrivacy] = useState<'public' | 'private'>('public');
     const [licenseSuggestions, setLicenseSuggestions] = useState<LicenseSuggestion[]>([]);
@@ -68,13 +96,27 @@ export function useMintWizard() {
     const [loadingMessage, setLoadingMessage] = useState('');
     const [error, setError] = useState<string | null>(null);
 
+    useEffect(() => {
+        const getSignerAddress = async () => {
+            try {
+                if (typeof window !== 'undefined' && (window as any).ethereum) {
+                    const provider = new ethers.BrowserProvider((window as any).ethereum);
+                    const accounts = await provider.send('eth_accounts', []);
+                    if (accounts && accounts.length > 0) {
+                        setForm(prev => ({ ...prev, owner: accounts[0] }));
+                    }
+                }
+            } catch (e) {
+                console.warn("Could not pre-fill owner address:", e);
+            }
+        };
+        getSignerAddress();
+    }, []);
+
     const steps: { id: WizardStepId, name: string }[] = [
-        { id: 'chooseType', name: 'Select Type' },
-        { id: 'upload', name: 'Upload' },
-        { id: 'details', name: 'Details' },
-        { id: 'licenses', name: 'Licensing' },
-        { id: 'privacy', name: 'Privacy' },
-        { id: 'mint', name: 'Mint' },
+        { id: 'chooseType', name: 'Select Type' }, { id: 'upload', name: 'Upload' },
+        { id: 'details', name: 'Details' }, { id: 'licenses', name: 'Licensing' },
+        { id: 'privacy', name: 'Privacy' }, { id: 'mint', name: 'Mint' },
     ];
     
     const currentStepIndex = useMemo(() => steps.findIndex(s => s.id === step), [step, steps]);
@@ -85,38 +127,43 @@ export function useMintWizard() {
     };
 
     const populateFormFromExtraction = (type: IpType, data: any) => {
-        const title = data.title || '';
-        const desc = data.high_level_overview || data.abstract || data.ai_summary?.abstract || '';
-        const kw = Array.isArray(data.keywords) ? data.keywords.join(', ') : data.keywords || '';
-        const rawAuthors = Array.isArray(data.authors) ? data.authors : [];
-        const authors = rawAuthors.map((a: any) => ({ name: typeof a === 'string' ? a : a.name || '' }));
-        setForm(prev => ({
-            ...prev,
-            title: prev.title || title,
-            description: prev.description || desc,
-            keywords: prev.keywords || kw,
-            aiSummary: prev.aiSummary || data.ai_summary?.summary || '',
-            authors: authors.length > 0 ? authors : prev.authors,
-        }));
+        let derivedFormState: Partial<FormState> = {};
+        if (type === 'research_paper') {
+            derivedFormState.title = data.title || '';
+            derivedFormState.description = data.abstract || data.ai_summary?.abstract || '';
+            derivedFormState.keywords = Array.isArray(data.keywords) ? data.keywords.join(', ') : data.keywords || '';
+            const rawAuthors = Array.isArray(data.authors) ? data.authors.map(a => ({ name: a.name || a })) : [];
+            derivedFormState.authors = rawAuthors.length > 0 ? rawAuthors : [{ name: '' }];
+        } else if (type === 'dataset') {
+            derivedFormState.title = data.title || '';
+            derivedFormState.description = data.description || '';
+            derivedFormState.keywords = Array.isArray(data.columns) ? data.columns.map((c: any) => c.name).join(', ') : '';
+        } else if (type === 'formula_method') {
+            derivedFormState.title = data.chemical_compound_name || '';
+            derivedFormState.description = data.description || '';
+            derivedFormState.keywords = Array.isArray(data.field_of_study) ? data.field_of_study.join(', ') : '';
+        }
+        setForm(prev => ({ ...prev, ...derivedFormState }));
     };
 
-    const handleFileUpload = async (file: File) => {
-        setPrimaryFile(file);
+    const handleFileUpload = async () => {
+        if (!primaryFile) {
+            setError("Please select a file before continuing.");
+            return;
+        }
         if (!useAI || !ipType) {
-            setForm(prev => ({ ...prev, title: file.name.replace(/\.[^/.]+$/, "") }));
+            setForm(prev => ({ ...prev, title: primaryFile.name.replace(/\.[^/.]+$/, "") }));
             setStep('details');
             return;
         }
-        
         setIsLoading(true);
         setLoadingMessage('AI is analyzing your document...');
         setError(null);
         try {
             let res: MetadataResponse | null = null;
-            if (ipType === 'research_paper') {
-                res = await fetchPaperExtraction(file);
-            }
-            // Add other fetch types here (dataset, formula) as needed
+            if (ipType === 'research_paper') res = await fetchPaperExtraction(primaryFile);
+            else if (ipType === 'dataset') res = await fetchDatasetExtraction(primaryFile, datasetDescription);
+            else if (ipType === 'formula_method') res = await fetchFormulaExtraction(primaryFile, formulaNote);
             
             if (res && res.success) {
                 setMetaResponse(res.data?.raw?.metadata || res.data);
@@ -128,7 +175,6 @@ export function useMintWizard() {
             }
         } catch (e: any) {
             setError(e.message);
-            setStep('upload'); // Stay on upload step if error
         } finally {
             setIsLoading(false);
             setLoadingMessage('');
@@ -172,13 +218,10 @@ export function useMintWizard() {
         setError(null);
         try {
             if (!primaryFile || !ipType) throw new Error("Missing file or IP type.");
-
-            // 1. Handle File Upload (Public or Private)
-            setLoadingMessage('Uploading file to IPFS...');
-            let contentCid = "";
-            let contentHashHex = "";
-            let encryption: any = { encrypted: false };
+            if (!form.owner || !ethers.isAddress(form.owner)) throw new Error("A valid owner wallet address is required.");
             
+            let contentCid = "", contentHashHex = "", encryption: any = { encrypted: false };
+            setLoadingMessage('Uploading file to IPFS...');
             if (privacy === "public") {
                 const buffer = await primaryFile.arrayBuffer();
                 const digest = await crypto.subtle.digest("SHA-256", buffer);
@@ -203,21 +246,48 @@ export function useMintWizard() {
                 console.log("DECRYPTION KEY (SAVE THIS!):", keyB64);
             }
 
-            // 2. Build and Upload Metadata
             setLoadingMessage('Uploading metadata to IPFS...');
-            const metadata = {
+            let metadata: any = {
                 title: form.title, description: form.description, authors: form.authors,
-                date_of_creation: new Date().toISOString(), ip_type: ipType,
+                date_of_creation: new Date().toISOString(), version: "1.0.0", ip_type: ipType,
                 keywords: form.keywords.split(',').map(k => k.trim()).filter(Boolean),
                 permanent_content_reference: { uri: `ipfs://${contentCid}`, content_hash: contentHashHex },
-                encryption, optional: { ai_summary: form.aiSummary }
+                encryption, optional: {},
+                ownership: { type: "individual", owner: form.owner }
             };
+
+            if (ipType === 'research_paper') {
+                metadata.optional.doi = metaResponse?.doi;
+                metadata.optional.venue = metaResponse?.venue;
+                metadata.optional.ai_summary = summaryResponse;
+            } else if (ipType === 'dataset') {
+                metadata.optional.source = metaResponse?.source;
+                metadata.optional.update_frequency = metaResponse?.update_frequency;
+                metadata.optional.limitations = metaResponse?.limitations;
+                metadata.optional.dataset_schema = { columns: metaResponse?.columns };
+                metadata.optional.ai_summary = {
+                    ...summaryResponse?.information,
+                    concise_summary: summaryResponse?.concise_summary
+                };
+            } else if (ipType === 'formula_method') {
+                metadata.optional.iupac_name = metaResponse?.iupac_name;
+                metadata.optional.application = metaResponse?.application;
+                metadata.optional.ai_summary = {
+                    what_it_is_about: metaResponse?.what_it_is_about,
+                    biological_role_notes: summaryResponse?.chemical_compound?.biological_role_notes,
+                };
+                if (privacy === 'public') {
+                    metadata.optional.ai_summary.structure_description = summaryResponse?.chemical_compound?.structure_description;
+                    metadata.optional.ai_summary.functional_groups = summaryResponse?.chemical_compound?.functional__groups;
+                    metadata.optional.ai_summary.chemical_formula = summaryResponse?.chemical_compound?.chemical_formula;
+                }
+            }
+
             const pinJsonRes = await fetch("/api/pin-json", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(metadata) });
             if (!pinJsonRes.ok) throw new Error("Failed to upload metadata to IPFS");
             const { cid: metaCid } = await pinJsonRes.json();
             const metadataUri = `ipfs://${metaCid}`;
 
-            // 3. Mint IP-NFT
             setLoadingMessage('Confirm transaction in wallet...');
             const ethereum = (window as any).ethereum;
             if (!ethereum) throw new Error("Wallet not found");
@@ -226,15 +296,23 @@ export function useMintWizard() {
             const userAddr = await signer.getAddress();
             const ipnftContract = new ethers.Contract(IPNFT_ADDRESS, IPNFT_ABI, signer);
             
-            const tx = await ipnftContract.mintIP(userAddr, metadataUri, contentHashHex as any, userAddr, 500, [userAddr], [100]);
+            const royaltyRecipient = form.owner;
+            const validPayees = form.authors.map(a => a.wallet).filter((w): w is string => !!w && ethers.isAddress(w));
+            const payees = validPayees.length > 0 ? [...new Set(validPayees)] : [royaltyRecipient];
+            const shares = payees.map(() => Math.floor(100 / payees.length));
+            if (shares.length > 0) {
+                let remainder = 100 % payees.length;
+                for (let i = 0; i < remainder; i++) shares[i]++;
+            }
+
+            const tx = await ipnftContract.mintIP(userAddr, metadataUri, contentHashHex as any, royaltyRecipient, 500, payees, shares);
+            
             setLoadingMessage('Waiting for transaction confirmation...');
             const receipt = await tx.wait();
-
             const ipMintedEvent = receipt.logs.map((log: any) => ipnftContract.interface.parseLog(log)).find((e: any) => e?.name === 'IPMinted');
             const ipTokenId = ipMintedEvent?.args.tokenId;
             if (!ipTokenId) throw new Error("Could not determine minted Token ID.");
 
-            // 4. Create License Offers
             if (selectedLicenses.length > 0) {
                 setLoadingMessage('Creating license offers...');
                 const licenseContract = new ethers.Contract(LICENSE_NFT_ADDRESS, LicenseNFT_ABI, signer);
@@ -254,8 +332,7 @@ export function useMintWizard() {
             }
 
             alert("IP Asset Minted Successfully!");
-            // Full Reset
-            setStep('chooseType'); setIpType(null); setPrimaryFile(null); setForm({ title: '', description: '', aiSummary: '', keywords: '', authors: [{ name: '' }] }); setLicenseSuggestions([]); setSelectedLicenses([]);
+            setStep('chooseType'); setIpType(null); setPrimaryFile(null); setForm({ title: '', description: '', aiSummary: '', keywords: '', authors: [{ name: '' }], owner: userAddr }); setLicenseSuggestions([]); setSelectedLicenses([]);
         } catch (e: any) {
              setError(e.message || "An unknown error occurred during minting.");
         } finally {
@@ -268,8 +345,10 @@ export function useMintWizard() {
     
     return {
         step, ipType, form, privacy, isLoading, loadingMessage, error, steps,
-        currentStepIndex, licenseSuggestions, selectedLicenses,
+        currentStepIndex, licenseSuggestions, selectedLicenses, datasetDescription, formulaNote,
+        primaryFile, setPrimaryFile,
         selectIpType, handleFileUpload, submitDetails, submitLicenses,
-        selectPrivacy, mint, goToStep, fetchLicenseSuggestions, toggleLicenseSelection
+        selectPrivacy, mint, goToStep, fetchLicenseSuggestions, toggleLicenseSelection,
+        setDatasetDescription, setFormulaNote
     };
 }

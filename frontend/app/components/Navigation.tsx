@@ -30,9 +30,9 @@ export function Navigation() {
             </Link>
 
             <div className="hidden md:flex items-center space-x-6 text-sm font-medium text-gray-400">
-              <Link href="#features" className="hover:text-white transition-colors">Features</Link>
-              <Link href="#how-it-works" className="hover:text-white transition-colors">How It Works</Link>
-              <Link href="/market" className="hover:text-white transition-colors">Market</Link>
+              <Link href="/ip-gallery" className="hover:text-white transition-colors">IP Gallery</Link>
+              <Link href="/mint-v2" className="hover:text-white transition-colors">Mint</Link>
+              <Link href="/validators" className="hover:text-white transition-colors">Governance</Link>
             </div>
 
             <div>

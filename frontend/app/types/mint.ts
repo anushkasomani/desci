@@ -1,5 +1,3 @@
-// types/mint.ts
-
 export type IpType = 'research_paper' | 'dataset' | 'formula_method' | 'other';
 
 export type WizardStepId = 'chooseType' | 'upload' | 'details' | 'licenses' | 'privacy' | 'mint';
@@ -16,12 +14,18 @@ export type Author = {
     wallet?: string;
 };
 
+export type Owner = {
+    name?: string;
+    wallet: string;
+};
+
 export type FormState = {
     title: string;
     description: string;
     aiSummary: string;
     keywords: string;
     authors: Author[];
+    owners: Owner[];
 };
 
 export type LicenseSuggestion = {
