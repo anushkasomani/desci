@@ -1,0 +1,6 @@
+google-genai
+python-multipart
+fastapi
+uvicorn
+pinecone
+dotenv
