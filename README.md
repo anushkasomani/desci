@@ -1,4 +1,4 @@
-# 🧬 GENOME - AI-Powered Intellectual Property Platform
+![WhatsApp Image 2025-08-24 at 22 50 19_d5a3724b](https://github.com/user-attachments/assets/2bce6bbc-f70a-4aab-8c8e-fe8a1416219b)# 🧬 GENOME - AI-Powered Intellectual Property Platform
 
 > **Transform Research into Tokenized IP Assets with AI**
 
@@ -120,16 +120,19 @@ GENOME is a decentralized platform that empowers researchers, innovators, and or
 │   IPFS Storage  │    │   The Graph     │    │   Pinecone      │
 │   (Content)     │    │   (Indexing)    │    │   (Vectors)     │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
+![WhatsApp Image 2025-08-24 at 22 43 27_0fe7d268](https://github.com/user-attachments/assets/bf6bdc35-0ed0-4530-9229-496e6c76721c)
+![WhatsApp Image 2025-08-24 at 22 50 19_d5a3724b](https://github.com/user-attachments/assets/e3c106f5-e861-4d61-b4d6-b84975e8e4e5)
+
 ```
 
 ## 🔧 Smart Contract Addresses
 
 > **⚠️ Contract addresses will be updated after deployment**
 
-- **IPNFT Contract**: `0x...` (ERC-721 for IP assets)
-- **LicenseNFT Contract**: `0x...` (ERC-721 for licensing)
-- **DerivativeIP Contract**: `0x...` (ERC-721 for derivatives)
-- **Desci Governance Token**: `0x...` (ERC-20 governance token)
+- **IPNFT Contract**: `0x293B992a65c9C6639271aE6452453D0DbE5e4C94` (ERC-721 for IP assets)
+- **LicenseNFT Contract**: `0x395ac2187f1C11f81657AAD8A57cAc22152d8eB2` (ERC-721 for licensing)
+- **DerivativeIP Contract**: `0x4203c6278092196dF74da89A53b99b827757238d` (ERC-721 for derivatives)
+- **Desci Governance Token**: `0x2d3d327020EaCE55d6f09cca3A82BB20677dA52D` (ERC-20 governance token)
 
 ## 🌐 AI API Endpoints
 
@@ -145,6 +148,8 @@ GENOME is a decentralized platform that empowers researchers, innovators, and or
 ### Vector Search API (Search Agent)
 - **Insert Content**: `https://sei-vectorsearch.onrender.com/insert`
 - **Search Content**: `https://sei-vectorsearch.onrender.com/retrieve`
+### n8n API( yet to be integrated with the frontend )
+- https://genome-io.onrender.com/webhook/chatbot
 
 ### Agent-Specific Endpoints
 - **Metadata Processing**: Content extraction and analysis
@@ -175,7 +180,6 @@ genome/
 ├── license-agent/           # AI license generation & suggestions
 │   ├── agent.py            # License recommendation engine
 │   ├── main.py             # License generation API
-│   └── royalties.json      # Royalty structure templates
 └── search-agent/            # Vector search & semantic matching
     ├── database.py         # Vector database operations
     ├── main.py             # Search API endpoints
@@ -280,13 +284,6 @@ npm run lint
 cd desci
 npm run test
 ```
-
-## 📚 Documentation
-
-- **Smart Contracts**: [Contract Documentation](./sei-hardhat-project/README.md)
-- **Frontend API**: [API Documentation](./frontend/README.md)
-- **Subgraph**: [GraphQL Schema](./desci/schema.graphql)
-- **Architecture**: [System Design](./docs/architecture.md)
 
 ## 🤝 Contributing
 
