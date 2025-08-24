@@ -2,18 +2,17 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useWallet } from '../hooks/useWallet'
 import { motion } from 'framer-motion'
 import { CubeTransparentIcon, SparklesIcon } from '@heroicons/react/24/outline'
 import { ProfileDropdown } from './ProfileDropdown'
 import { GovernanceModal } from './GovernanceModal'
-import SearchAgent from './SearchAgent'
+import { WalletConnect } from './WalletConnect'
+import { useWagmiWallet } from '../hooks/useWagmiWallet'
 
 export function Navigation() {
   // REMOVED: All scroll-related state and effects are now gone.
-  const { userAddress, tokenBalance, isConnecting, connectWallet } = useWallet()
+  const { address, isConnected, tokenBalance } = useWagmiWallet()
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [isSearchOpen, setIsSearchOpen] = useState(false)
 
   return (
     <>
@@ -36,31 +35,20 @@ export function Navigation() {
               <Link href="/mint-v2" className="hover:text-white transition-colors">Mint</Link>
               <Link href="/ai-assistant" className="hover:text-white transition-colors">AI Assistant</Link>
               <Link href="/validators" className="hover:text-white transition-colors">Governance</Link>
-              <button
-                onClick={() => setIsSearchOpen(true)}
-                className="p-2 hover:bg-gray-800/50 rounded-full transition-colors"
-                title="AI Search Assistant"
-              >
+              <Link href="/ai-assistant" className="p-2 hover:bg-gray-800/50 rounded-full transition-colors" title="AI Search Assistant">
                 <SparklesIcon className="w-5 h-5 text-indigo-400 hover:text-cyan-400" />
-              </button>
+              </Link>
             </div>
 
             <div>
-              {userAddress ? (
+              {isConnected && address ? (
                 <ProfileDropdown 
-                  userAddress={userAddress} 
+                  userAddress={address} 
                   tokenBalance={tokenBalance}
                   onGovernanceClick={() => setIsModalOpen(true)}
                 />
               ) : (
-                <button
-                  onClick={connectWallet}
-                  disabled={isConnecting}
-                  className="group relative px-6 py-2.5 text-sm font-bold text-white bg-indigo-600 rounded-full hover:bg-indigo-500 transition-colors disabled:opacity-60"
-                >
-                  <span className="absolute -inset-0.5 rounded-full bg-gradient-to-r from-cyan-400 to-indigo-600 opacity-0 group-hover:opacity-75 transition-opacity blur"></span>
-                  <span className="relative">{isConnecting ? 'Connecting...' : 'Connect Wallet'}</span>
-                </button>
+                <WalletConnect />
               )}
             </div>
           </div>
@@ -68,7 +56,6 @@ export function Navigation() {
       </motion.nav>
       
       <GovernanceModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
-      <SearchAgent isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
     </>
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useWallet } from '../hooks/useWallet'
+import { useWagmiWallet } from '../hooks/useWagmiWallet'
 import { motion, AnimatePresence } from 'framer-motion'
 import { UsersIcon, XMarkIcon } from '@heroicons/react/24/solid'
 
@@ -10,13 +10,18 @@ type GovernanceModalProps = {
 }
 
 export function GovernanceModal({ isOpen, onClose }: GovernanceModalProps) {
-  const { isMinting, handleMintTokens, error } = useWallet()
+  const { isMinting, handleMintTokens, error, isMintSuccess } = useWagmiWallet()
   
   const onMintClick = async () => {
     const success = await handleMintTokens()
     if (success) {
-      onClose() // Close modal on successful mint
+      // The modal will be closed when the transaction is successful
     }
+  }
+
+  // Close modal on successful mint
+  if (isMintSuccess) {
+    onClose()
   }
 
   return (
@@ -52,7 +57,7 @@ export function GovernanceModal({ isOpen, onClose }: GovernanceModalProps) {
             <div className="mt-8 space-y-4">
                 <div className="p-4 bg-gray-800/50 rounded-lg text-center">
                     <p className="text-sm text-gray-400">Mint Price</p>
-                    <p className="text-xl font-bold text-white">100 Tokens for 0.1 SEI</p>
+                    <p className="text-xl font-bold text-white">100 Tokens for 0.1 ETH</p>
                 </div>
                 <button
                     onClick={onMintClick}

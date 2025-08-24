@@ -1,12 +1,13 @@
 // app/ai-assistant/page.tsx
 'use client'
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { SparklesIcon, MagnifyingGlassIcon } from '@heroicons/react/24/solid';
+import { SparklesIcon, MagnifyingGlassIcon, WalletIcon } from '@heroicons/react/24/solid';
 import { DocumentTextIcon, CircleStackIcon, BeakerIcon } from '@heroicons/react/24/outline';
 import { Navigation } from '../components/Navigation';
 import { Footer } from '../components/Footer';
+import { WalletConnect } from '../components/WalletConnect';
 import Link from 'next/link';
 
 interface SearchResult {
@@ -58,38 +59,90 @@ const SkeletonLoader = () => (
 );
 
 export default function AiAssistantPage() {
-  const [query, setQuery] = useState('');
-  const [namespace, setNamespace] = useState<'paper' | 'dataset' | 'algo'>('paper');
-  const [results, setResults] = useState<SearchResult[] | null>(null); // Use null to distinguish from an empty result
-  const [isSearching, setIsSearching] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [namespace, setNamespace] = useState<'paper' | 'dataset' | 'algo'>('paper');
+  const [results, setResults] = useState<SearchResult[] | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [testMode, setTestMode] = useState(false);
 
-  const handleSearch = async () => {
-    if (!query.trim()) return;
-    setIsSearching(true);
-    setError(null);
-    // DO NOT clear results here. Wait for the new results.
- try {
- const top_k = 3;
-const encodedQuery = encodeURIComponent(query.trim());
-const url = `https://sei-vectorsearch.onrender.com/retrieve?top_k=${top_k}&query=${encodedQuery}&namespace=${namespace}`;
-const response = await fetch(url, { method: 'POST' });
- if (!response.ok) throw new Error(`Search API returned an error: ${response.status}`);
-const data = await response.json();
-console.log('Search API response data:', data);
- const rawResults: SearchResult[] = Array.isArray(data) ? data : (data.results || []);
- const filteredResults = rawResults.filter(r => typeof r.score === 'number' && r.score > 0.0);
+  // Debug: Log state changes
+  console.log('Current state:', { query, namespace, results, isSearching, error, testMode });
+
+  // Auto-search when test mode is activated
+  useEffect(() => {
+    if (testMode && query === 'co2') {
+      setTestMode(false);
+      handleSearch();
+    }
+  }, [query, testMode]);
+
+  const handleSearch = async () => {
+    if (!query.trim()) return;
+    setIsSearching(true);
+    setError(null);
+    
+    try {
+      const top_k = 3;
+      const encodedQuery = encodeURIComponent(query.trim());
+      const url = `https://sei-vectorsearch.onrender.com/retrieve?top_k=${top_k}&query=${encodedQuery}&namespace=${namespace}`;
       
-
-     setResults(filteredResults);
-
-    } catch (err) {
-      setError('Search failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
-      setResults([]); // Set to empty array on error
-    } finally {
-      setIsSearching(false);
-    }
-  };
+      console.log('Making request to:', url);
+      const response = await fetch(url, { method: 'POST' });
+      
+      if (!response.ok) throw new Error(`Search API returned an error: ${response.status}`);
+      
+      const data = await response.json();
+      console.log('Search API response data:', data);
+      
+      // Handle the response properly
+      let rawResults: SearchResult[] = [];
+      
+      if (Array.isArray(data)) {
+        // Direct array response
+        rawResults = data;
+      } else if (data && Array.isArray(data.results)) {
+        // Response with results property
+        rawResults = data.results;
+      } else if (data && typeof data === 'object') {
+        // Try to find any array in the response
+        const possibleArrays = Object.values(data).filter(val => Array.isArray(val));
+        if (possibleArrays.length > 0) {
+          rawResults = possibleArrays[0];
+        }
+      }
+      
+      console.log('Processed raw results:', rawResults);
+      
+      // Filter results to ensure they have valid id and score
+      const filteredResults = rawResults.filter(r => 
+        r && 
+        typeof r === 'object' && 
+        r.id && 
+        typeof r.score === 'number' && 
+        r.score >= 0 && 
+        r.text
+      );
+      
+      console.log('Filtered results:', filteredResults);
+      
+      if (filteredResults.length === 0) {
+        setError('No valid results found in the API response. Please try a different search.');
+        setResults([]);
+      } else {
+        setResults(filteredResults);
+        setError(null);
+        console.log('Setting results to:', filteredResults);
+      }
+      
+    } catch (err) {
+      console.error('Search error:', err);
+      setError('Search failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      setResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') handleSearch();
@@ -104,78 +157,127 @@ console.log('Search API response data:', data);
             <div className="text-center mb-12">
               <h1 className="text-5xl font-extrabold text-white mb-3">AI Discovery Engine</h1>
               <p className="text-lg text-gray-400">Instantly find relevant IP assets using natural language.</p>
-            </div>
+            
+            {/* Wallet Connection Section */}
+            <div className="mt-8 flex justify-center">
+              <div className="bg-gray-900/50 border border-indigo-500/20 rounded-xl p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <WalletIcon className="w-6 h-6 text-indigo-400" />
+                  <h3 className="text-lg font-semibold text-white">Connect Your Wallet</h3>
+                </div>
+                <p className="text-sm text-gray-400 mb-4">
+                  Connect your wallet to access advanced features and manage your IP assets.
+                </p>
+                <WalletConnect />
+              </div>
+            </div>
+          </div>
 
             {/* Search Input Card */}
-            <div className="bg-gray-900 border border-indigo-500/20 rounded-2xl p-6 mb-12">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                    {/* Search Query Input */}
-                    <div className="md:col-span-2">
-                        <label htmlFor="search-query" className="block text-sm font-medium text-gray-300 mb-2">Search Query</label>
-                        <div className="relative">
-                            <input
-                                type="text" id="search-query"
-                                value={query} onChange={e => setQuery(e.target.value)}
-                                onKeyPress={handleKeyPress}
-                                placeholder="e.g., 'Carbon capture methods using zeolites'"
-                                className="w-full pl-10 pr-4 py-2.5 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                            />
-                            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                        </div>
-                    </div>
-                    {/* Namespace Select */}
-                    <div>
-                        <label htmlFor="namespace" className="block text-sm font-medium text-gray-300 mb-2">IP Type</label>
-                        <select
-                            id="namespace" value={namespace} onChange={e => setNamespace(e.target.value as any)}
-                            className="w-full px-3 py-2.5 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                        >
-                            <option value="paper">Research Papers</option>
-                            <option value="dataset">Datasets</option>
-                            <option value="algo">Algorithms</option>
-                        </select>
-                    </div>
+            <div className="bg-gray-900 border border-indigo-500/20 rounded-2xl p-6 mb-12">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                {/* Search Query Input */}
+                <div className="md:col-span-2">
+                  <label htmlFor="search-query" className="block text-sm font-medium text-gray-300 mb-2">Search Query</label>
+                  <div className="relative">
+                    <input
+                      type="text" id="search-query"
+                      value={query} onChange={e => setQuery(e.target.value)}
+                      onKeyPress={handleKeyPress}
+                      placeholder="e.g., 'Carbon capture methods using zeolites'"
+                      className="w-full pl-10 pr-4 py-2.5 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                    <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                  </div>
                 </div>
-              <button onClick={handleSearch} disabled={isSearching || !query.trim()} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors font-semibold">
-                <SparklesIcon className="w-5 h-5" />
-                {isSearching ? 'Searching...' : 'Search with AI'}
-              </button>
-            </div>
+                {/* Namespace Select */}
+                <div>
+                  <label htmlFor="namespace" className="block text-sm font-medium text-gray-300 mb-2">IP Type</label>
+                  <select
+                    id="namespace" value={namespace} onChange={e => setNamespace(e.target.value as any)}
+                    className="w-full px-3 py-2.5 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  >
+                    <option value="paper">Research Papers</option>
+                    <option value="dataset">Datasets</option>
+                    <option value="algo">Algorithms</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button 
+                  onClick={handleSearch} 
+                  disabled={isSearching || !query.trim()} 
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors font-semibold"
+                >
+                  <SparklesIcon className="w-5 h-5" />
+                  {isSearching ? 'Searching...' : 'Search with AI'}
+                </button>
+                <button 
+                  onClick={() => {
+                    setQuery('co2');
+                    setNamespace('paper');
+                    setTestMode(true); // Activate test mode
+                  }}
+                  className="px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-500 transition-colors font-semibold"
+                >
+                  Test Search
+                </button>
+              </div>
+            </div>
 
             {/* Results Section */}
-            <div className="space-y-6">
-              {isSearching && <SkeletonLoader />}
+            <div className="space-y-6">
+              {isSearching && <SkeletonLoader />}
                 
-                {!isSearching && error && (
-                    <div className="p-4 bg-red-900/30 border border-red-500/30 rounded-md text-center">
-                        <p className="text-red-300">{error}</p>
+              {!isSearching && error && (
+                <div className="p-4 bg-red-900/30 border border-red-500/30 rounded-md text-center">
+                  <p className="text-red-300">{error}</p>
+                </div>
+              )}
+
+              {/* Debug Section */}
+              <div className="bg-gray-800/30 border border-gray-600 rounded-lg p-4">
+                <h4 className="text-sm font-semibold text-gray-300 mb-2">Debug Info:</h4>
+                <div className="text-xs text-gray-400 space-y-1">
+                  <p>Query: "{query}"</p>
+                  <p>Namespace: {namespace}</p>
+                  <p>Results: {results ? `${results.length} items` : 'null'}</p>
+                  <p>Is Searching: {isSearching.toString()}</p>
+                  <p>Error: {error || 'none'}</p>
+                  <p>Test Mode: {testMode.toString()}</p>
+                  {results && results.length > 0 && (
+                    <div>
+                      <p>First result: ID={results[0].id}, Score={results[0].score}</p>
                     </div>
-                )}
+                  )}
+                </div>
+              </div>
 
-                {!isSearching && results && (
-                    results.length > 0 ? (
-                        <div>
-                            <h3 className="text-xl font-bold text-white mb-6">Found {results.length} relevant asset{results.length > 1 ? 's' : ''}</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {results.map((result, index) => <ResultCard key={result.id} result={result} index={index} />)}
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="text-center py-12">
-                            <MagnifyingGlassIcon className="mx-auto w-12 h-12 text-gray-700 mb-4" />
-                            <p className="text-gray-400">No relevant results found.</p>
-                            <p className="text-sm text-gray-500 mt-1">Try adjusting your search terms or IP type.</p>
-                        </div>
-                    )
-                )}
+              {!isSearching && results && results.length > 0 && (
+                <div>
+                  <h3 className="text-xl font-bold text-white mb-6">Found {results.length} relevant asset{results.length > 1 ? 's' : ''}</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {results.map((result, index) => <ResultCard key={result.id} result={result} index={index} />)}
+                  </div>
+                </div>
+              )}
 
-              {!results && !isSearching && !error && (
-                <div className="text-center py-12">
-                  <SparklesIcon className="mx-auto w-12 h-12 text-indigo-600 mb-4" />
-                  <p className="text-gray-300">Your AI-powered search results will appear here.</p>
-                </div>
-              )}
-            </div>
+              {!isSearching && results && results.length === 0 && (
+                <div className="text-center py-12">
+                  <MagnifyingGlassIcon className="mx-auto w-12 h-12 text-gray-700 mb-4" />
+                  <p className="text-gray-400">No relevant results found.</p>
+                  <p className="text-sm text-gray-500 mt-1">Try adjusting your search terms or IP type.</p>
+                </div>
+              )}
+
+              {!results && !isSearching && !error && (
+                <div className="text-center py-12">
+                  <SparklesIcon className="mx-auto w-12 h-12 text-indigo-600 mb-4" />
+                  <p className="text-gray-300">Your AI-powered search results will appear here.</p>
+                  <p className="text-sm text-gray-500 mt-1">Enter a query above to begin.</p>
+                </div>
+              )}
+            </div>
         </div>
       </main>
       <Footer />

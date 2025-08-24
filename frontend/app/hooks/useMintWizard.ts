@@ -87,7 +87,7 @@ export function useMintWizard() {
     const [form, setForm] = useState<FormState>({
         title: '', description: '', aiSummary: '', keywords: '',
         authors: [{ name: '' }],
-        owner: ''
+        owners: [{ wallet: '' }]
     });
     const [privacy, setPrivacy] = useState<'public' | 'private'>('public');
     const [licenseSuggestions, setLicenseSuggestions] = useState<LicenseSuggestion[]>([]);
@@ -103,7 +103,7 @@ export function useMintWizard() {
                     const provider = new ethers.BrowserProvider((window as any).ethereum);
                     const accounts = await provider.send('eth_accounts', []);
                     if (accounts && accounts.length > 0) {
-                        setForm(prev => ({ ...prev, owner: accounts[0] }));
+                        setForm(prev => ({ ...prev, owners: [{ wallet: accounts[0] }] }));
                     }
                 }
             } catch (e) {
@@ -132,7 +132,7 @@ export function useMintWizard() {
             derivedFormState.title = data.title || '';
             derivedFormState.description = data.abstract || data.ai_summary?.abstract || '';
             derivedFormState.keywords = Array.isArray(data.keywords) ? data.keywords.join(', ') : data.keywords || '';
-            const rawAuthors = Array.isArray(data.authors) ? data.authors.map(a => ({ name: a.name || a })) : [];
+            const rawAuthors = Array.isArray(data.authors) ? data.authors.map((a: any) => ({ name: a.name || a })) : [];
             derivedFormState.authors = rawAuthors.length > 0 ? rawAuthors : [{ name: '' }];
         } else if (type === 'dataset') {
             derivedFormState.title = data.title || '';
@@ -218,7 +218,7 @@ export function useMintWizard() {
         setError(null);
         try {
             if (!primaryFile || !ipType) throw new Error("Missing file or IP type.");
-            if (!form.owner || !ethers.isAddress(form.owner)) throw new Error("A valid owner wallet address is required.");
+            if (!form.owners || form.owners.length === 0 || !ethers.isAddress(form.owners[0].wallet)) throw new Error("A valid owner wallet address is required.");
             
             let contentCid = "", contentHashHex = "", encryption: any = { encrypted: false };
             setLoadingMessage('Uploading file to IPFS...');
@@ -253,7 +253,7 @@ export function useMintWizard() {
                 keywords: form.keywords.split(',').map(k => k.trim()).filter(Boolean),
                 permanent_content_reference: { uri: `ipfs://${contentCid}`, content_hash: contentHashHex },
                 encryption, optional: {},
-                ownership: { type: "individual", owner: form.owner }
+                ownership: { type: "individual", owner: form.owners[0].wallet }
             };
 
             if (ipType === 'research_paper') {
@@ -296,7 +296,7 @@ export function useMintWizard() {
             const userAddr = await signer.getAddress();
             const ipnftContract = new ethers.Contract(IPNFT_ADDRESS, IPNFT_ABI, signer);
             
-            const royaltyRecipient = form.owner;
+            const royaltyRecipient = form.owners[0].wallet;
             const validPayees = form.authors.map(a => a.wallet).filter((w): w is string => !!w && ethers.isAddress(w));
             const payees = validPayees.length > 0 ? [...new Set(validPayees)] : [royaltyRecipient];
             const shares = payees.map(() => Math.floor(100 / payees.length));
@@ -366,12 +366,13 @@ export function useMintWizard() {
                                ipType === 'dataset' ? summaryResponse?.concise_summary || form.description :
                                summaryResponse?.chemical_compound?.description || form.description;
                 
-                // Create form data as expected by the API
-                const formData = new FormData();
-                formData.append('id', ipTokenId.toString());
-                formData.append('summary', summary || form.description);
-                formData.append('title', form.title);
-                formData.append('namespace', namespace);
+                // Build query parameters for the API
+                const params = new URLSearchParams({
+                    id: ipTokenId.toString(),
+                    summary: summary || form.description,
+                    title: form.title,
+                    namespace: namespace
+                });
                 
                 console.log('Indexing IP in vector search:', {
                     id: ipTokenId.toString(),
@@ -380,9 +381,8 @@ export function useMintWizard() {
                     namespace: namespace
                 });
                 
-                const response = await fetch('https://sei-vectorsearch.onrender.com/insert', {
-                    method: 'POST',
-                    body: formData
+                const response = await fetch(`https://sei-vectorsearch.onrender.com/insert?${params.toString()}`, {
+                    method: 'POST'
                 });
                 
                 if (!response.ok) {
@@ -397,7 +397,7 @@ export function useMintWizard() {
             }
             
             alert("IP Asset Minted Successfully!");
-            setStep('chooseType'); setIpType(null); setPrimaryFile(null); setForm({ title: '', description: '', aiSummary: '', keywords: '', authors: [{ name: '' }], owner: userAddr }); setLicenseSuggestions([]); setSelectedLicenses([]);
+            setStep('chooseType'); setIpType(null); setPrimaryFile(null); setForm({ title: '', description: '', aiSummary: '', keywords: '', authors: [{ name: '' }], owners: [{ wallet: '' }] }); setLicenseSuggestions([]); setSelectedLicenses([]);
         } catch (e: any) {
              setError(e.message || "An unknown error occurred during minting.");
         } finally {
