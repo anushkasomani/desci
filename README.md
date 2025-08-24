@@ -294,26 +294,10 @@ npm run test
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🌟 Acknowledgments
-
-- **Sei Network** for high-performance blockchain infrastructure
-- **Google Gemini 2.0** for advanced AI capabilities
-- **Pinecone** for vector database technology
-- **Grobid** for academic document processing
-- **OpenZeppelin** for secure smart contract libraries
-- **The Graph** for decentralized indexing
 
 ## 📞 Support & Contact
 
-- **Website**: [genome.ai](https://genome.ai)
-- **Documentation**: [docs.genome.ai](https://docs.genome.ai)
-- **Discord**: [Join our community](https://discord.gg/genome)
-- **Email**: support@genome.ai
-
+- **Website**: https://genomeio.vercel.app/
 ---
 
 **Built with ❤️ by the GENOME Team**
