@@ -54,7 +54,8 @@ Whether you’re a large corporation or an independent researcher, GENOME provid
 - *Storage:* IPFS/ Pinata
 - *Encryption:* Symmetric + Asymmetric key encryption  
 - *Governance:* Token-based validator system  
-- *Frontend:* Nextjs + Tailwind 
+- *Frontend:* Nextjs + Tailwind
+- *vectorDB:* Pinecone
 
 ---
 
