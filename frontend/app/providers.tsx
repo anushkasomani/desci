@@ -4,6 +4,12 @@ import {
   QueryClient,
   QueryClientProvider,
 } from '@tanstack/react-query'
+import { WagmiProvider } from 'wagmi'
+import { QueryClient as WagmiQueryClient } from '@tanstack/react-query'
+import { RainbowKitProvider } from '@rainbow-me/rainbowkit'
+import { config } from './lib/wagmi'
+import '@rainbow-me/rainbowkit/styles.css'
+
 function makeQueryClient() {
   return new QueryClient({
     defaultOptions: {
@@ -15,6 +21,7 @@ function makeQueryClient() {
     },
   })
 }
+
 let browserQueryClient: QueryClient | undefined = undefined
 function getQueryClient() {
   if (isServer) {
@@ -29,9 +36,21 @@ function getQueryClient() {
     return browserQueryClient
   }
 }
+
+// Create a wagmi query client
+const wagmiQueryClient = new WagmiQueryClient()
+
 export default function Providers({ children }: Readonly<{children: React.ReactNode}>) {
   const queryClient = getQueryClient()
   return (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    <WagmiProvider config={config}>
+      <WagmiQueryClient.Provider client={wagmiQueryClient}>
+        <RainbowKitProvider>
+          <QueryClientProvider client={queryClient}>
+            {children}
+          </QueryClientProvider>
+        </RainbowKitProvider>
+      </WagmiQueryClient.Provider>
+    </WagmiProvider>
   )
 }
