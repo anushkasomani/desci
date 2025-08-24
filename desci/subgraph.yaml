@@ -8,7 +8,7 @@ dataSources:
     name: IPNFT
     network: sei-atlantic
     source:
-      address: "0x043FdF7F85030B6cF49124675987A8526d495fd8"
+      address: "0x293B992a65c9C6639271aE6452453D0DbE5e4C94"
       abi: IPNFT
       startBlock: 192898930
     mapping:
@@ -55,7 +55,7 @@ dataSources:
     name: LicenseNFT
     network: sei-atlantic
     source:
-      address: "0x02F13d8505ba549C05D2fa3e32901f8527716616"
+      address: "0x395ac2187f1C11f81657AAD8A57cAc22152d8eB2"
       abi: LicenseNFT
       startBlock: 192898916
     mapping:
@@ -97,7 +97,7 @@ dataSources:
     name: DerivativeIP
     network: sei-atlantic
     source:
-      address: "0x55Bfdb285664Bf4f52c3d6b36c8623c1E2E02be3"
+      address: "0x4203c6278092196dF74da89A53b99b827757238d"
       abi: DerivativeIP
       startBlock: 192898916
     mapping:
@@ -123,7 +123,7 @@ dataSources:
     name: Desci
     network: sei-atlantic
     source:
-      address: "0x62b8847515A1B47336cCE068FE272e5F93F11b4c"
+      address: "0x2d3d327020EaCE55d6f09cca3A82BB20677dA52D"
       abi: Desci
       startBlock: 192898916
     mapping:
