@@ -5,10 +5,10 @@ const fs = require("fs");
 async function main() {
   // Option A: hardcode addresses (replace)
   const addresses = {
-    ipnft: "0x043FdF7F85030B6cF49124675987A8526d495fd8",
-    license: "0x02F13d8505ba549C05D2fa3e32901f8527716616",
-    derivative: "0x55Bfdb285664Bf4f52c3d6b36c8623c1E2E02be3",
-    desci: "0x62b8847515A1B47336cCE068FE272e5F93F11b4c"
+    ipnft: "0x293B992a65c9C6639271aE6452453D0DbE5e4C94",
+    license: "0x395ac2187f1C11f81657AAD8A57cAc22152d8eB2",
+    derivative: "0x4203c6278092196dF74da89A53b99b827757238d",
+    desci: "0x2d3d327020EaCE55d6f09cca3A82BB20677dA52D"
   };
 
   // Option B: read addresses from deployed.json if your deploy script wrote one

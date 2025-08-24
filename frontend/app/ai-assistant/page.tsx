@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SparklesIcon, MagnifyingGlassIcon } from '@heroicons/react/24/solid';
+import { DocumentTextIcon, CircleStackIcon, BeakerIcon } from '@heroicons/react/24/outline';
 import { Navigation } from '../components/Navigation';
 import { Footer } from '../components/Footer';
 import Link from 'next/link';
@@ -59,7 +60,7 @@ const SkeletonLoader = () => (
 export default function AiAssistantPage() {
   const [query, setQuery] = useState('');
   const [namespace, setNamespace] = useState<'paper' | 'dataset' | 'algo'>('paper');
-  const [results, setResults] = useState<SearchResult[] | null>(null);
+  const [results, setResults] = useState<SearchResult[] | null>(null); // Use null to distinguish from an empty result
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,19 +68,24 @@ export default function AiAssistantPage() {
     if (!query.trim()) return;
     setIsSearching(true);
     setError(null);
-    try {
-      const top_k = 3;
-      const encodedQuery = encodeURIComponent(query.trim());
-      const url = `https://sei-vectorsearch.onrender.com/retrieve?top_k=${top_k}&query=${encodedQuery}&namespace=${namespace}`;
-      const response = await fetch(url, { method: 'POST' });
-      if (!response.ok) throw new Error(`Search API returned an error: ${response.status}`);
-      const data = await response.json();
-      const rawResults: SearchResult[] = Array.isArray(data) ? data : (data.results || []);
-      const filteredResults = rawResults.filter(r => typeof r.score === 'number' && r.score > 0.0);
-      setResults(filteredResults);
+    // DO NOT clear results here. Wait for the new results.
+ try {
+ const top_k = 3;
+const encodedQuery = encodeURIComponent(query.trim());
+const url = `https://sei-vectorsearch.onrender.com/retrieve?top_k=${top_k}&query=${encodedQuery}&namespace=${namespace}`;
+const response = await fetch(url, { method: 'POST' });
+ if (!response.ok) throw new Error(`Search API returned an error: ${response.status}`);
+const data = await response.json();
+console.log('Search API response data:', data);
+ const rawResults: SearchResult[] = Array.isArray(data) ? data : (data.results || []);
+ const filteredResults = rawResults.filter(r => typeof r.score === 'number' && r.score > 0.0);
+      
+
+     setResults(filteredResults);
+
     } catch (err) {
       setError('Search failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
-      setResults([]);
+      setResults([]); // Set to empty array on error
     } finally {
       setIsSearching(false);
     }
@@ -94,13 +100,16 @@ export default function AiAssistantPage() {
       <Navigation />
       <main className="pt-24 pb-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-12">
+            {/* Header */}
+            <div className="text-center mb-12">
               <h1 className="text-5xl font-extrabold text-white mb-3">AI Discovery Engine</h1>
               <p className="text-lg text-gray-400">Instantly find relevant IP assets using natural language.</p>
             </div>
 
-            <div className="bg-gray-900 border border-indigo-500/20 rounded-2xl p-6 mb-12">
+            {/* Search Input Card */}
+            <div className="bg-gray-900 border border-indigo-500/20 rounded-2xl p-6 mb-12">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    {/* Search Query Input */}
                     <div className="md:col-span-2">
                         <label htmlFor="search-query" className="block text-sm font-medium text-gray-300 mb-2">Search Query</label>
                         <div className="relative">
@@ -114,6 +123,7 @@ export default function AiAssistantPage() {
                             <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
                         </div>
                     </div>
+                    {/* Namespace Select */}
                     <div>
                         <label htmlFor="namespace" className="block text-sm font-medium text-gray-300 mb-2">IP Type</label>
                         <select
@@ -132,7 +142,7 @@ export default function AiAssistantPage() {
               </button>
             </div>
 
-            {/* FIXED: Results Section with improved conditional logic */}
+            {/* Results Section */}
             <div className="space-y-6">
               {isSearching && <SkeletonLoader />}
                 
@@ -142,7 +152,7 @@ export default function AiAssistantPage() {
                     </div>
                 )}
 
-                {!isSearching && !error && results && (
+                {!isSearching && results && (
                     results.length > 0 ? (
                         <div>
                             <h3 className="text-xl font-bold text-white mb-6">Found {results.length} relevant asset{results.length > 1 ? 's' : ''}</h3>
@@ -154,17 +164,15 @@ export default function AiAssistantPage() {
                         <div className="text-center py-12">
                             <MagnifyingGlassIcon className="mx-auto w-12 h-12 text-gray-700 mb-4" />
                             <p className="text-gray-400">No relevant results found.</p>
-                            <p className="text-sm text-gray-500 mt-1">This can happen if no assets match your query or their relevance score is too low.</p>
+                            <p className="text-sm text-gray-500 mt-1">Try adjusting your search terms or IP type.</p>
                         </div>
                     )
                 )}
 
-                {/* This condition now correctly identifies the initial state before any search */}
-              {!isSearching && !error && results === null && (
+              {!results && !isSearching && !error && (
                 <div className="text-center py-12">
                   <SparklesIcon className="mx-auto w-12 h-12 text-indigo-600 mb-4" />
                   <p className="text-gray-300">Your AI-powered search results will appear here.</p>
-                    <p className="text-sm text-gray-500 mt-1">Enter a query above to begin.</p>
                 </div>
               )}
             </div>

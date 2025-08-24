@@ -34,7 +34,7 @@ export function Navigation() {
             <div className="hidden md:flex items-center space-x-6 text-sm font-medium text-gray-400">
               <Link href="/ip-gallery" className="hover:text-white transition-colors">IP Gallery</Link>
               <Link href="/mint-v2" className="hover:text-white transition-colors">Mint</Link>
-              <Link href="/my-licenses" className="hover:text-white transition-colors">My Licenses</Link>
+              <Link href="/ai-assistant" className="hover:text-white transition-colors">AI Assistant</Link>
               <Link href="/validators" className="hover:text-white transition-colors">Governance</Link>
               <button
                 onClick={() => setIsSearchOpen(true)}
