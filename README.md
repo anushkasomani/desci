@@ -1,4 +1,4 @@
-![WhatsApp Image 2025-08-24 at 22 50 19_d5a3724b](https://github.com/user-attachments/assets/2bce6bbc-f70a-4aab-8c8e-fe8a1416219b)# 🧬 GENOME - AI-Powered Intellectual Property Platform
+# 🧬 GENOME - AI-Powered Intellectual Property Platform
 
 > **Transform Research into Tokenized IP Assets with AI**
 
@@ -120,10 +120,11 @@ GENOME is a decentralized platform that empowers researchers, innovators, and or
 │   IPFS Storage  │    │   The Graph     │    │   Pinecone      │
 │   (Content)     │    │   (Indexing)    │    │   (Vectors)     │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
+
+```
 ![WhatsApp Image 2025-08-24 at 22 43 27_0fe7d268](https://github.com/user-attachments/assets/bf6bdc35-0ed0-4530-9229-496e6c76721c)
 ![WhatsApp Image 2025-08-24 at 22 50 19_d5a3724b](https://github.com/user-attachments/assets/e3c106f5-e861-4d61-b4d6-b84975e8e4e5)
 
-```
 
 ## 🔧 Smart Contract Addresses
 
