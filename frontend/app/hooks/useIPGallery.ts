@@ -8,8 +8,9 @@ import { LICENSE_NFT_ADDRESS, LicenseNFT_ABI, DERIVATIVE_IP_NFT_ADDRESS, Derivat
 import type { IPNFT, LicenseOffer, IPMetadata, DerivativeFormData } from '../types/gallery' 
 
 const IPFS_GATEWAY = 'https://moccasin-broad-kiwi-732.mypinata.cloud/ipfs/'
-const GRAPH_URL = 'https://api.studio.thegraph.com/query/118776/desci/version/latest'
+const GRAPH_URL = 'https://api.studio.thegraph.com/query/118776/subgraph-desci/version/latest'
 const GRAPH_AUTH = 'Bearer 9c42f8dcf2cf487337de6f2b55a971ec'
+
 
 async function fetchJsonFromUri(uri: string): Promise<any | null> {
     if (!uri) return null
